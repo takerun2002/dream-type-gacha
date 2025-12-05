@@ -9,9 +9,15 @@ import { fal } from "@fal-ai/client";
 import fs from "fs";
 import path from "path";
 
+// 🔐 APIキーチェック（サーバーサイドのみ）
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.error("⚠️ GEMINI_API_KEY is not set!");
+}
+
 // Gemini API初期化（優先）
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
+  apiKey: GEMINI_API_KEY || "",
 });
 
 // FAL AI初期化（フォールバック）

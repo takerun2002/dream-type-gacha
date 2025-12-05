@@ -9,8 +9,14 @@ import {
   ELEMENT_INFO 
 } from "@/lib/fortuneEngine";
 
+// 🔐 APIキーチェック（サーバーサイドのみ）
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  console.error("⚠️ GEMINI_API_KEY is not set!");
+}
+
 // Gemini API初期化
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || "");
 
 /**
  * Gemini 2.5 Proでパーソナライズされた診断メッセージを生成
