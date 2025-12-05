@@ -10,7 +10,7 @@ import {
 } from "@/lib/fortuneEngine";
 
 // Gemini API初期化
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyDbfFVcai0OAgTB2z7DEMeaoj9mn43HDjU");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 /**
  * Gemini 2.5 Proでパーソナライズされた診断メッセージを生成

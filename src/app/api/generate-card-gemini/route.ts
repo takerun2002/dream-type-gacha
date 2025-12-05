@@ -11,7 +11,7 @@ import path from "path";
 
 // Gemini API初期化（優先）
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "AIzaSyDbfFVcai0OAgTB2z7DEMeaoj9mn43HDjU",
+  apiKey: process.env.GEMINI_API_KEY || "",
 });
 
 // FAL AI初期化（フォールバック）
