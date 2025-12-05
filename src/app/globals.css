@@ -1,26 +1,688 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================
+   夢タイプ診断ガチャ - Date with Dream Note
+   キービジュアルのトンマナに合わせたUI
+   ============================================ */
+
+/* カスタムフォント定義 */
+@font-face {
+  font-family: 'A-OTF-ShinGoPro';
+  src: url('/fonts/A-OTF-ShinGoPro-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@font-face {
+  font-family: 'A-OTF-ShinGoPro';
+  src: url('/fonts/A-OTF-ShinGoPro-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@font-face {
+  font-family: 'A-OTF-MidashiGoPro-MB31';
+  src: url('/fonts/A-OTF-MidashiGoPro-MB31.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Base Styles */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(180deg, #2d1028 0%, #1a0a1a 50%, #120812 100%);
+  color: #fff5f8;
+  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Background Gradient - キービジュアル風 */
+.bg-gradient-dream {
+  background: 
+    radial-gradient(ellipse at 30% 20%, rgba(201, 75, 124, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 30%, rgba(155, 75, 138, 0.2) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 80%, rgba(232, 122, 160, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(122, 75, 155, 0.2) 0%, transparent 40%),
+    linear-gradient(180deg, #2d1028 0%, #1a0a1a 50%, #120812 100%);
+}
+
+/* Light rays effect */
+.light-rays {
+  position: fixed;
+  inset: 0;
+  background: 
+    linear-gradient(135deg, transparent 40%, rgba(255, 220, 230, 0.03) 50%, transparent 60%),
+    linear-gradient(45deg, transparent 40%, rgba(255, 200, 220, 0.02) 50%, transparent 60%);
+  pointer-events: none;
+  animation: light-shift 8s ease-in-out infinite;
+}
+
+@keyframes light-shift {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Animated Stars Background */
+.stars-bg {
+  position: fixed;
+  inset: 0;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, rgba(255, 200, 220, 0.4), transparent),
+    radial-gradient(2px 2px at 40px 70px, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgba(232, 180, 200, 0.5), transparent),
+    radial-gradient(2px 2px at 160px 120px, rgba(255, 200, 220, 0.3), transparent),
+    radial-gradient(1px 1px at 230px 80px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 300px 150px, rgba(232, 122, 160, 0.3), transparent);
+  background-repeat: repeat;
+  background-size: 350px 250px;
+  animation: twinkle 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* Text Styles */
+.text-gradient {
+  background: linear-gradient(135deg, #e8c9a4 0%, #e87aa0 50%, #9b4b8a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-pink {
+  background: linear-gradient(135deg, #fff5f8 0%, #e87aa0 50%, #c94b7c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-glow {
+  filter: drop-shadow(0 0 20px rgba(201, 75, 124, 0.6));
+}
+
+.text-glow-soft {
+  text-shadow: 0 0 30px rgba(232, 122, 160, 0.5), 0 0 60px rgba(201, 75, 124, 0.3);
+}
+
+/* Glass Card - 幻想的な半透明 */
+.glass-card {
+  background: linear-gradient(135deg, rgba(45, 16, 40, 0.9) 0%, rgba(26, 10, 26, 0.95) 100%);
+  border: 1px solid rgba(201, 75, 124, 0.3);
+  border-radius: 1.5rem;
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 0 40px rgba(201, 75, 124, 0.3),
+    inset 0 1px 0 rgba(255, 200, 220, 0.1);
+}
+
+.glass-card-gold {
+  background: linear-gradient(135deg, rgba(45, 16, 40, 0.95) 0%, rgba(35, 15, 35, 0.98) 100%);
+  border: 2px solid rgba(212, 165, 116, 0.4);
+  border-radius: 1.5rem;
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 0 60px rgba(212, 165, 116, 0.15),
+    0 0 30px rgba(201, 75, 124, 0.1),
+    inset 0 1px 0 rgba(212, 165, 116, 0.2);
+}
+
+/* Primary Button - ローズピンク */
+.btn-primary {
+  background: linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%);
+  color: white;
+  font-weight: 700;
+  padding: 1rem 2.5rem;
+  border-radius: 9999px;
+  font-size: 1.125rem;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 4px 20px rgba(201, 75, 124, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(201, 75, 124, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Gold Button */
+.btn-gold {
+  background: linear-gradient(135deg, #d4a574 0%, #c99660 100%);
+  color: #1a0a1a;
+  font-weight: 700;
+  padding: 1rem 2.5rem;
+  border-radius: 9999px;
+  font-size: 1.125rem;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 4px 20px rgba(212, 165, 116, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 30px rgba(212, 165, 116, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background: transparent;
+  color: #e8b4c8;
+  font-weight: 600;
+  padding: 0.875rem 2rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(201, 75, 124, 0.5);
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(201, 75, 124, 0.15);
+  border-color: #c94b7c;
+  color: white;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Pulse Glow Animation */
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 
+      0 4px 20px rgba(201, 75, 124, 0.4),
+      0 0 40px rgba(201, 75, 124, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 4px 30px rgba(201, 75, 124, 0.6),
+      0 0 60px rgba(232, 122, 160, 0.4);
+  }
+}
+
+/* Float Animation */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+/* Progress Bar */
+.progress-bar {
+  height: 8px;
+  background: rgba(201, 75, 124, 0.2);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c94b7c, #e87aa0, #d4a574);
+  border-radius: 9999px;
+  box-shadow: 0 0 10px rgba(201, 75, 124, 0.5);
+}
+
+/* Question Option */
+.question-option {
+  background: rgba(45, 16, 40, 0.7);
+  border: 2px solid rgba(201, 75, 124, 0.25);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  transition: all 0.3s ease;
+  color: #e8b4c8;
+  text-align: left;
+  width: 100%;
+}
+
+.question-option:hover {
+  background: rgba(201, 75, 124, 0.15);
+  border-color: rgba(201, 75, 124, 0.5);
+  color: white;
+  transform: translateX(8px);
+}
+
+.question-option.selected {
+  background: linear-gradient(135deg, rgba(201, 75, 124, 0.3) 0%, rgba(155, 75, 138, 0.2) 100%);
+  border-color: #c94b7c;
+  color: white;
+  box-shadow: 0 0 20px rgba(201, 75, 124, 0.3);
+}
+
+/* Input Field */
+.input-field {
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  background: rgba(45, 16, 40, 0.7);
+  border: 2px solid rgba(201, 75, 124, 0.3);
+  border-radius: 1rem;
+  color: white;
+  font-size: 1.125rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.input-field::placeholder {
+  color: rgba(232, 180, 200, 0.5);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #c94b7c;
+  box-shadow: 0 0 20px rgba(201, 75, 124, 0.3);
+}
+
+/* Kinman Character - 透過PNG対応 */
+.kinman-character {
+  filter: drop-shadow(0 8px 20px rgba(201, 75, 124, 0.4))
+          drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
+  transition: transform 0.3s ease;
+}
+
+.kinman-character:hover {
+  transform: scale(1.05);
+}
+
+/* Speech Bubble */
+.speech-bubble {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255, 245, 248, 0.98) 0%, rgba(255, 240, 245, 0.98) 100%);
+  color: #2d1028;
+  padding: 1.5rem 2rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 15px solid rgba(255, 245, 248, 0.98);
+}
+
+/* Type Badge */
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(201, 75, 124, 0.2);
+  border: 1px solid rgba(201, 75, 124, 0.4);
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  color: #e8b4c8;
+}
+
+/* Strength List */
+.strength-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(201, 75, 124, 0.1);
+  border-radius: 0.75rem;
+  color: #e8b4c8;
+}
+
+.strength-item::before {
+  content: '✦';
+  color: #d4a574;
+}
+
+/* Gacha Card */
+.gacha-card {
+  width: 280px;
+  height: 400px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.gacha-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gacha-card.flipped .gacha-card-inner {
+  transform: rotateY(180deg);
+}
+
+.gacha-card-front,
+.gacha-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+.gacha-card-front {
+  background: linear-gradient(135deg, #2d1028 0%, #3d1838 50%, #2d1028 100%);
+  border: 3px solid #d4a574;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gacha-card-back {
+  background: linear-gradient(135deg, rgba(45, 16, 40, 0.85) 0%, #3d1838 100%);
+  border: 3px solid #d4a574;
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Card Container for 3D flip */
+.card-container {
+  perspective: 1000px;
+  width: 300px;
+  height: 400px;
+}
+
+.card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+.card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.card-back {
+  background: linear-gradient(135deg, #2d1028 0%, #1a0a1a 100%);
+  border: 3px solid #9b4b8a;
+  box-shadow: 0 0 30px rgba(155, 75, 138, 0.5);
+}
+
+.card-front {
+  transform: rotateY(180deg);
+}
+
+/* Key Visual Background */
+.bg-key-visual {
+  position: fixed;
+  inset: 0;
+  background-image: url('/images/key-visual.jpg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.15;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #2d1028;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c94b7c;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e87aa0;
+}
+
+/* Selection */
+::selection {
+  background: rgba(201, 75, 124, 0.4);
+  color: white;
+}
+
+/* ============================================
+   DOPA風 ガチャボタン
+   立体感のある影付きグラデーションボタン
+   ============================================ */
+
+/* メインガチャボタン - レッド/オレンジ */
+.btn-gacha {
+  background: linear-gradient(180deg, #ff7b7b 0%, #ff5252 40%, #e53935 100%);
+  color: white;
+  font-weight: 900;
+  font-size: 1.5rem;
+  padding: 1.25rem 3rem;
+  border-radius: 50px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 
+    0 6px 0 #b71c1c,
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 
+    2px 2px 0 rgba(0, 0, 0, 0.3),
+    0 0 10px rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.05em;
+}
+
+.btn-gacha:hover {
+  background: linear-gradient(180deg, #ff8a8a 0%, #ff6b6b 40%, #ef5350 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 0 #b71c1c,
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+.btn-gacha:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 2px 0 #b71c1c,
+    0 4px 10px rgba(0, 0, 0, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-gacha:disabled {
+  background: linear-gradient(180deg, #9e9e9e 0%, #757575 100%);
+  box-shadow: 0 4px 0 #424242;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ゴールドガチャボタン */
+.btn-gacha-gold {
+  background: linear-gradient(180deg, #ffd54f 0%, #ffb300 40%, #ff8f00 100%);
+  color: #3e2723;
+  font-weight: 900;
+  font-size: 1.5rem;
+  padding: 1.25rem 3rem;
+  border-radius: 50px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 
+    0 6px 0 #e65100,
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  text-shadow: 
+    1px 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 10px rgba(255, 215, 0, 0.5);
+  letter-spacing: 0.05em;
+}
+
+.btn-gacha-gold:hover {
+  background: linear-gradient(180deg, #ffe082 0%, #ffc107 40%, #ffa000 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 0 #e65100,
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+
+.btn-gacha-gold:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 2px 0 #e65100,
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* レインボーガチャボタン（10連など） */
+.btn-gacha-rainbow {
+  background: linear-gradient(90deg, 
+    #ff6b6b 0%, 
+    #feca57 20%, 
+    #48dbfb 40%, 
+    #ff9ff3 60%, 
+    #54a0ff 80%, 
+    #ff6b6b 100%);
+  background-size: 200% 100%;
+  color: white;
+  font-weight: 900;
+  font-size: 1.5rem;
+  padding: 1.25rem 3rem;
+  border-radius: 50px;
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 
+    0 6px 0 #6c5ce7,
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 
+    2px 2px 0 rgba(0, 0, 0, 0.4),
+    0 0 15px rgba(255, 255, 255, 0.5);
+  animation: rainbow-shift 3s linear infinite;
+}
+
+@keyframes rainbow-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.btn-gacha-rainbow:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 0 #6c5ce7,
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+.btn-gacha-rainbow:active {
+  transform: translateY(4px);
+  box-shadow: 
+    0 2px 0 #6c5ce7,
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* テキスト縁取り（視認性向上） */
+.text-outline {
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.5);
+  paint-order: stroke fill;
+}
+
+.text-outline-white {
+  -webkit-text-stroke: 3px white;
+  paint-order: stroke fill;
+}
+
+/* ガチャタイトル（DOPA風） */
+.gacha-title {
+  font-weight: 900;
+  font-size: 2rem;
+  color: #fff;
+  text-shadow: 
+    3px 3px 0 #c94b7c,
+    -1px -1px 0 #c94b7c,
+    1px -1px 0 #c94b7c,
+    -1px 1px 0 #c94b7c,
+    0 0 20px rgba(201, 75, 124, 0.8);
+  letter-spacing: 0.1em;
+}
+
+/* ガチャサブタイトル */
+.gacha-subtitle {
+  font-weight: 700;
+  font-size: 1.25rem;
+  background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+/* キラキラアニメーション（ボタン用） */
+.sparkle-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.sparkle-effect::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  animation: sparkle-sweep 2s ease-in-out infinite;
+}
+
+@keyframes sparkle-sweep {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) rotate(45deg); }
 }

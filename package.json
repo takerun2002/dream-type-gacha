@@ -9,17 +9,37 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.7.2",
+    "@fal-ai/serverless-client": "^0.15.0",
+    "@fingerprintjs/fingerprintjs": "^5.0.1",
+    "@google/genai": "^1.31.0",
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.86.2",
+    "@tsparticles/react": "^3.0.0",
+    "@tsparticles/slim": "^3.9.1",
+    "@types/nodemailer": "^7.0.4",
+    "@types/three": "^0.181.0",
+    "framer-motion": "^12.23.24",
+    "howler": "^2.2.4",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.4",
     "next": "16.0.5",
+    "nodemailer": "^7.0.11",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "satori": "^0.18.3",
+    "sharp": "^0.34.5",
+    "three": "^0.181.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/howler": "^2.2.12",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
+    "puppeteer": "^24.32.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
