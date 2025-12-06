@@ -27,7 +27,7 @@ interface Answer {
 }
 
 // 🔐 合言葉（パスワード）設定
-const SECRET_PASSWORD = process.env.NEXT_PUBLIC_ACCESS_PASSWORD || "kinman2024";
+const SECRET_PASSWORD = process.env.NEXT_PUBLIC_ACCESS_PASSWORD || "kinman2015";
 
 // リッチなオーラエフェクトコンポーネント
 function MysticalAura() {
@@ -389,10 +389,6 @@ export default function Home() {
                   ✨ 診断を始める
                 </motion.button>
               </form>
-              
-              <p className="text-purple-400/60 text-xs mt-4">
-                ※ 合言葉はライブ中にお伝えします
-              </p>
             </div>
           </motion.div>
         )}
