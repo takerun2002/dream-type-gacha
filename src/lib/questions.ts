@@ -1,4 +1,5 @@
 // 診断用質問データ - 9種類のきんまんカード対応 + 記述式質問追加
+// 🔄 バランス調整版v2: 全タイプが均等に出るように設計
 
 export interface Question {
   id: number;
@@ -14,6 +15,13 @@ export interface QuestionOption {
   points: Record<string, number>;
 }
 
+/**
+ * 質問設計のバランス目標:
+ * - 選択式8問 × 4選択肢 = 32選択肢
+ * - 各選択肢: メイン(+2) × 1, サブ(+1) × 1
+ * - 9タイプ: 各合計ポイントが10-11になるよう均等配分
+ */
+
 export const questions: Question[] = [
   {
     id: 1,
@@ -23,22 +31,22 @@ export const questions: Question[] = [
       {
         id: "1a",
         text: "何度でも立ち上がって挑戦する",
-        points: { phoenix: 3 },
+        points: { phoenix: 2, elephant: 1 },
       },
       {
         id: "1b",
         text: "直感を信じて別の道を探す",
-        points: { kitsune: 2, wolf: 1 },
+        points: { kitsune: 2, dragon: 1 },
       },
       {
         id: "1c",
         text: "高い視点から状況を見直す",
-        points: { pegasus: 2, dragon: 1 },
+        points: { pegasus: 2, turtle: 1 },
       },
       {
         id: "1d",
         text: "焦らず時間をかけて解決する",
-        points: { turtle: 2, elephant: 1 },
+        points: { turtle: 2, wolf: 1 },
       },
     ],
   },
@@ -55,7 +63,7 @@ export const questions: Question[] = [
       {
         id: "2b",
         text: "自然の中でゆっくり過ごす",
-        points: { deer: 3 },
+        points: { deer: 2, elephant: 1 },
       },
       {
         id: "2c",
@@ -110,7 +118,7 @@ export const questions: Question[] = [
       {
         id: "5a",
         text: "頼りになる、信頼できる",
-        points: { elephant: 2, turtle: 1 },
+        points: { elephant: 2, shark: 1 },
       },
       {
         id: "5b",
@@ -120,12 +128,12 @@ export const questions: Question[] = [
       {
         id: "5c",
         text: "一緒にいると元気が出る",
-        points: { phoenix: 2, wolf: 1 },
+        points: { wolf: 2, phoenix: 1 },
       },
       {
         id: "5d",
         text: "夢が大きい、理想が高い",
-        points: { pegasus: 2, dragon: 1 },
+        points: { dragon: 2, pegasus: 1 },
       },
     ],
   },
@@ -137,17 +145,17 @@ export const questions: Question[] = [
       {
         id: "6a",
         text: "諦めない強い心",
-        points: { phoenix: 2, shark: 1 },
+        points: { shark: 2, phoenix: 1 },
       },
       {
         id: "6b",
         text: "直感を信じる勇気",
-        points: { kitsune: 2, wolf: 1 },
+        points: { kitsune: 2, pegasus: 1 },
       },
       {
         id: "6c",
         text: "仲間との絆",
-        points: { wolf: 2, deer: 1 },
+        points: { wolf: 2, elephant: 1 },
       },
       {
         id: "6d",
@@ -170,7 +178,7 @@ export const questions: Question[] = [
       {
         id: "8a",
         text: "体を動かしてスッキリする",
-        points: { shark: 2, phoenix: 1 },
+        points: { shark: 2, wolf: 1 },
       },
       {
         id: "8b",
@@ -180,12 +188,12 @@ export const questions: Question[] = [
       {
         id: "8c",
         text: "信頼できる人に話を聞いてもらう",
-        points: { wolf: 2, elephant: 1 },
+        points: { elephant: 2, kitsune: 1 },
       },
       {
         id: "8d",
         text: "静かに自分と向き合う",
-        points: { kitsune: 2, dragon: 1 },
+        points: { dragon: 2, deer: 1 },
       },
     ],
   },
@@ -197,7 +205,7 @@ export const questions: Question[] = [
       {
         id: "9a",
         text: "リーダーシップと影響力",
-        points: { dragon: 2, wolf: 1 },
+        points: { dragon: 2, shark: 1 },
       },
       {
         id: "9b",
@@ -207,7 +215,7 @@ export const questions: Question[] = [
       {
         id: "9c",
         text: "集中力と突破力",
-        points: { shark: 2, phoenix: 1 },
+        points: { phoenix: 2, turtle: 1 },
       },
       {
         id: "9d",
@@ -234,12 +242,12 @@ export const questions: Question[] = [
       {
         id: "10c",
         text: "大切な人を幸せにしている自分",
-        points: { wolf: 2, elephant: 1 },
+        points: { wolf: 2, kitsune: 1 },
       },
       {
         id: "10d",
         text: "穏やかで充実した日々を送る自分",
-        points: { deer: 2, turtle: 1 },
+        points: { kitsune: 2, elephant: 1 },
       },
     ],
   },
@@ -274,18 +282,26 @@ export function calculateResult(answers: Array<{ questionId: number; answerId?: 
     }
   });
 
-  // 最高スコアのタイプを返す
-  let maxType = "phoenix";
+  // 最高スコアのタイプを返す（同点の場合はランダムに選択）
   let maxScore = 0;
+  const topTypes: string[] = [];
 
   Object.entries(scores).forEach(([type, score]) => {
     if (score > maxScore) {
       maxScore = score;
-      maxType = type;
+      topTypes.length = 0;
+      topTypes.push(type);
+    } else if (score === maxScore) {
+      topTypes.push(type);
     }
   });
 
-  return maxType;
+  // 同点の場合はランダムに選択
+  if (topTypes.length > 1) {
+    return topTypes[Math.floor(Math.random() * topTypes.length)];
+  }
+
+  return topTypes[0] || "phoenix";
 }
 
 // スコア詳細を取得する関数（デバッグ・詳細表示用）
@@ -317,4 +333,32 @@ export function calculateScores(answers: Array<{ questionId: number; answerId?: 
   });
 
   return scores;
+}
+
+// デバッグ用: ポイント分布を確認する関数
+export function analyzePointDistribution(): { main: Record<string, number>; sub: Record<string, number> } {
+  const mainCount: Record<string, number> = {
+    phoenix: 0, kitsune: 0, pegasus: 0, elephant: 0,
+    deer: 0, dragon: 0, turtle: 0, shark: 0, wolf: 0,
+  };
+  const subCount: Record<string, number> = {
+    phoenix: 0, kitsune: 0, pegasus: 0, elephant: 0,
+    deer: 0, dragon: 0, turtle: 0, shark: 0, wolf: 0,
+  };
+
+  questions.forEach((q) => {
+    if (q.options) {
+      q.options.forEach((opt) => {
+        Object.entries(opt.points).forEach(([type, points]) => {
+          if (points >= 2) {
+            mainCount[type]++;
+          } else {
+            subCount[type]++;
+          }
+        });
+      });
+    }
+  });
+
+  return { main: mainCount, sub: subCount };
 }
