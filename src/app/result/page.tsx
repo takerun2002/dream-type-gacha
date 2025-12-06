@@ -4,10 +4,17 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { dreamTypes } from "@/lib/dreamTypes";
 import { generateCardWithGemini, downloadCardGemini, isShareSupported, type CardDataGemini } from "@/lib/cardGeneratorGemini";
 import { getSavedDiagnosisData } from "@/lib/diagnosisRecord";
 import Confetti from "@/components/Confetti";
+
+// Three.js背景を動的インポート（SSR無効）
+const CosmicBackground = dynamic(() => import("@/components/CosmicBackground"), {
+  ssr: false,
+  loading: () => <div className="fixed inset-0 -z-10 bg-gradient-dream" />,
+});
 
 interface FortuneData {
   kyusei: {
@@ -56,84 +63,40 @@ interface DiagnosisResult {
 // カード生成のタイムアウト（秒）
 const CARD_GENERATION_TIMEOUT = 60;
 
-// きんまん先生の占いアニメーションコンポーネント（GIF使用）
+// きんまん先生の占いアニメーションコンポーネント（動画使用）
 function FortuneLoadingAnimation({ progress }: { progress: number }) {
   return (
-    <div className="relative w-full max-w-md min-h-[500px] flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/80 to-indigo-900/80 rounded-2xl p-6 overflow-hidden">
-      {/* 背景の星キラキラ */}
-      {[...Array(20)].map((_, i) => (
-        <motion.div
-          key={`star-${i}`}
-          className="absolute w-1 h-1 bg-white rounded-full"
-          style={{
-            left: `${10 + (i * 4.5)}%`,
-            top: `${5 + (i * 4.7)}%`,
-          }}
-          animate={{
-            opacity: [0, 1, 0],
-            scale: [0, 1.5, 0],
-          }}
-          transition={{
-            duration: 2 + (i % 3),
-            repeat: Infinity,
-            delay: i * 0.2,
-          }}
-        />
-      ))}
-
-      {/* きんまん先生GIFアニメーション */}
+    <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/80 to-indigo-900/80 rounded-2xl p-6 overflow-hidden">
+      {/* きんまん先生動画アニメーション */}
       <motion.div
         className="relative"
-        animate={{ y: [0, -10, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5 }}
       >
         {/* 背景のグロウエフェクト */}
         <motion.div
-          className="absolute inset-0 rounded-full blur-xl opacity-50"
+          className="absolute inset-0 rounded-full blur-2xl opacity-40"
           style={{
-            background: "radial-gradient(circle, rgba(147,112,219,0.6) 0%, rgba(147,112,219,0) 70%)",
+            background: "radial-gradient(circle, rgba(147,112,219,0.8) 0%, rgba(147,112,219,0) 70%)",
           }}
           animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.3, 0.6, 0.3],
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
           }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
         
-        {/* 透過WebPアニメーション */}
-        <Image
-          src="/animations/kinman-fortune.webp"
-          alt="きんまん先生が占い中"
-          width={300}
-          height={300}
-          className="relative z-10"
-          unoptimized // WebPアニメーションのため最適化を無効化
-          priority
-        />
-
-        {/* 魔法のパーティクル */}
-        {[...Array(8)].map((_, i) => (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute"
-            style={{ left: "50%", top: "50%" }}
-            animate={{
-              x: [0, (i % 2 === 0 ? 1 : -1) * (50 + i * 10)],
-              y: [0, -80 - i * 10],
-              opacity: [1, 0],
-              scale: [0, 1, 0],
-            }}
-            transition={{
-              duration: 2 + (i % 3) * 0.5,
-              repeat: Infinity,
-              delay: i * 0.3,
-            }}
-          >
-            <span className="text-2xl">
-              {["✨", "⭐", "🌟", "💫", "🔮", "💜", "💙", "💖"][i]}
-            </span>
-          </motion.div>
-        ))}
+        {/* 動画プレイヤー */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="relative z-10 w-[280px] h-[280px] object-cover rounded-lg"
+        >
+          <source src="/animations/kinman-fortune-light.mp4" type="video/mp4" />
+        </video>
       </motion.div>
 
       {/* テキストとプログレス */}
@@ -142,7 +105,7 @@ function FortuneLoadingAnimation({ progress }: { progress: number }) {
         animate={{ opacity: [0.7, 1, 0.7] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <p className="text-xl font-bold text-gradient mb-2">
+        <p className="text-lg font-bold text-gradient mb-1">
           🔮 あなたの運命を占っています...
         </p>
         <p className="text-purple-300 text-sm">
@@ -151,10 +114,10 @@ function FortuneLoadingAnimation({ progress }: { progress: number }) {
       </motion.div>
 
       {/* プログレスバー */}
-      <div className="w-full max-w-xs mt-4">
-        <div className="bg-purple-900/50 rounded-full h-3 mb-2 overflow-hidden">
+      <div className="w-full max-w-xs mt-3">
+        <div className="bg-purple-900/50 rounded-full h-2 mb-1 overflow-hidden">
           <motion.div
-            className="h-3 rounded-full"
+            className="h-2 rounded-full"
             style={{
               background: "linear-gradient(90deg, #9370db, #ff6b9d, #ffd700)",
             }}
@@ -163,21 +126,10 @@ function FortuneLoadingAnimation({ progress }: { progress: number }) {
             transition={{ duration: 0.5 }}
           />
         </div>
-        <p className="text-purple-400 text-sm text-center">
+        <p className="text-purple-400 text-xs text-center">
           {Math.round(progress)}% 完了
         </p>
       </div>
-
-      {/* タイムアウト警告 */}
-      {progress > 70 && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-yellow-400 text-xs mt-4 text-center"
-        >
-          ✨ もう少しで完成です...
-        </motion.p>
-      )}
     </div>
   );
 }
@@ -398,8 +350,8 @@ export default function ResultPage() {
 
   if (!typeData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-dream">
-        <div className="stars-bg" />
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        <CosmicBackground accentColor="#9370db" intensity={0.8} />
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -471,18 +423,22 @@ export default function ResultPage() {
   const personalizedMessage = diagnosisResult?.personalizedMessage || typeData.description;
 
   return (
-    <main className="min-h-screen py-8 px-4 relative overflow-hidden bg-gradient-dream">
-      {/* 背景 */}
-      <div className="stars-bg" />
+    <main className="min-h-screen py-8 px-4 relative overflow-hidden">
+      {/* Three.js 宇宙背景 */}
+      <CosmicBackground accentColor={typeData.color} intensity={1} />
       
       {/* 紙吹雪 */}
       {showConfetti && <Confetti />}
 
-      {/* タイプカラーのグラデーション装飾 */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
+      {/* タイプカラーのグロウオーバーレイ */}
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full blur-[150px] opacity-30"
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full blur-[200px] opacity-20"
           style={{ backgroundColor: typeData.color }}
+        />
+        <div
+          className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full blur-[180px] opacity-15"
+          style={{ backgroundColor: "#ff6b9d" }}
         />
       </div>
 
