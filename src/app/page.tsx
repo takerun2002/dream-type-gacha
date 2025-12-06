@@ -479,7 +479,7 @@ export default function Home() {
                   textShadow: '0 2px 8px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.6)',
                 }}
               >
-                ⏱️ 所要時間：約3分 ｜ 📱 スマホ対応
+                📱 スマホ対応
               </motion.p>
             </motion.div>
 

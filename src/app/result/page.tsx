@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { dreamTypes } from "@/lib/dreamTypes";
@@ -55,6 +55,144 @@ interface DiagnosisResult {
 
 // カード生成のタイムアウト（秒）
 const CARD_GENERATION_TIMEOUT = 60;
+
+// きんまん先生の占いアニメーションコンポーネント（AI生成フレーム使用）
+const FORTUNE_FRAMES = [
+  "/animations/kinman-fortune-frame-1.png",
+  "/animations/kinman-fortune-frame-2.png",
+  "/animations/kinman-fortune-frame-3.png",
+];
+
+function FortuneLoadingAnimation({ progress }: { progress: number }) {
+  const [currentFrame, setCurrentFrame] = useState(0);
+
+  // フレームを1秒ごとに切り替え
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentFrame((prev) => (prev + 1) % FORTUNE_FRAMES.length);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative w-full max-w-md min-h-[500px] flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/60 to-indigo-900/60 rounded-2xl p-6 overflow-hidden">
+      {/* 背景の星キラキラ */}
+      {[...Array(20)].map((_, i) => (
+        <motion.div
+          key={`star-${i}`}
+          className="absolute w-1 h-1 bg-white rounded-full"
+          style={{
+            left: `${10 + (i * 4.5)}%`,
+            top: `${5 + (i * 4.7)}%`,
+          }}
+          animate={{
+            opacity: [0, 1, 0],
+            scale: [0, 1.5, 0],
+          }}
+          transition={{
+            duration: 2 + (i % 3),
+            repeat: Infinity,
+            delay: i * 0.2,
+          }}
+        />
+      ))}
+
+      {/* きんまん先生アニメーション */}
+      <motion.div
+        className="relative"
+        animate={{ y: [0, -10, 0] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {/* AI生成フレームを切り替え表示 */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentFrame}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Image
+              src={FORTUNE_FRAMES[currentFrame]}
+              alt="きんまん先生が占い中"
+              width={280}
+              height={280}
+              className="relative z-10"
+              priority
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* 魔法のパーティクル */}
+        {[...Array(8)].map((_, i) => (
+          <motion.div
+            key={`particle-${i}`}
+            className="absolute"
+            style={{ left: "40%", top: "50%" }}
+            animate={{
+              x: [0, (i % 2 === 0 ? 1 : -1) * (50 + i * 10)],
+              y: [0, -80 - i * 10],
+              opacity: [1, 0],
+              scale: [0, 1, 0],
+            }}
+            transition={{
+              duration: 2 + (i % 3) * 0.5,
+              repeat: Infinity,
+              delay: i * 0.3,
+            }}
+          >
+            <span className="text-2xl">
+              {["✨", "⭐", "🌟", "💫", "🔮", "💜", "💙", "💖"][i]}
+            </span>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* テキストとプログレス */}
+      <motion.div
+        className="mt-4 text-center z-10"
+        animate={{ opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        <p className="text-xl font-bold text-gradient mb-2">
+          🔮 あなたの運命を占っています...
+        </p>
+        <p className="text-purple-300 text-sm">
+          きんまん先生がカードを召喚中
+        </p>
+      </motion.div>
+
+      {/* プログレスバー */}
+      <div className="w-full max-w-xs mt-4">
+        <div className="bg-purple-900/50 rounded-full h-3 mb-2 overflow-hidden">
+          <motion.div
+            className="h-3 rounded-full"
+            style={{
+              background: "linear-gradient(90deg, #9370db, #ff6b9d, #ffd700)",
+            }}
+            initial={{ width: "0%" }}
+            animate={{ width: `${Math.min(progress, 100)}%` }}
+            transition={{ duration: 0.5 }}
+          />
+        </div>
+        <p className="text-purple-400 text-sm text-center">
+          {Math.round(progress)}% 完了
+        </p>
+      </div>
+
+      {/* タイムアウト警告 */}
+      {progress > 70 && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-yellow-400 text-xs mt-4 text-center"
+        >
+          ✨ もう少しで完成です...
+        </motion.p>
+      )}
+    </div>
+  );
+}
 
 export default function ResultPage() {
   const router = useRouter();
@@ -462,175 +600,8 @@ export default function ResultPage() {
                 </p>
               </div>
             ) : (
-              // ローディング表示（きんまん先生の占いアニメーション）
-              <div className="relative w-full max-w-md min-h-[500px] flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/60 to-indigo-900/60 rounded-2xl p-6 overflow-hidden">
-                {/* 背景の星キラキラ */}
-                {[...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={`star-${i}`}
-                    className="absolute w-1 h-1 bg-white rounded-full"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      top: `${Math.random() * 100}%`,
-                    }}
-                    animate={{
-                      opacity: [0, 1, 0],
-                      scale: [0, 1.5, 0],
-                    }}
-                    transition={{
-                      duration: 2 + Math.random() * 2,
-                      repeat: Infinity,
-                      delay: Math.random() * 2,
-                    }}
-                  />
-                ))}
-
-                {/* きんまん先生アニメーション */}
-                <motion.div
-                  className="relative"
-                  animate={{
-                    y: [0, -10, 0],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  {/* 水晶玉の発光エフェクト */}
-                  <motion.div
-                    className="absolute"
-                    style={{
-                      left: "25%",
-                      top: "50%",
-                      width: "80px",
-                      height: "80px",
-                      borderRadius: "50%",
-                      background: "radial-gradient(circle, rgba(147,112,219,0.8) 0%, rgba(147,112,219,0) 70%)",
-                      filter: "blur(15px)",
-                    }}
-                    animate={{
-                      scale: [1, 1.5, 1],
-                      opacity: [0.5, 1, 0.5],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                  
-                  {/* 水晶玉の虹色リング */}
-                  <motion.div
-                    className="absolute"
-                    style={{
-                      left: "20%",
-                      top: "45%",
-                      width: "90px",
-                      height: "90px",
-                      borderRadius: "50%",
-                      border: "3px solid transparent",
-                      background: "linear-gradient(45deg, #ff6b9d, #c44cff, #6bb3ff, #4cffb3, #fff44c, #ff6b9d) border-box",
-                      WebkitMask: "linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)",
-                      WebkitMaskComposite: "xor",
-                      maskComposite: "exclude",
-                    }}
-                    animate={{
-                      rotate: 360,
-                      scale: [1, 1.1, 1],
-                    }}
-                    transition={{
-                      rotate: { duration: 4, repeat: Infinity, ease: "linear" },
-                      scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                    }}
-                  />
-
-                  {/* きんまん画像 */}
-                  <Image
-                    src="/kinman-assets/kinman-crystal-ball.png"
-                    alt="きんまん先生が占い中"
-                    width={250}
-                    height={250}
-                    className="relative z-10"
-                  />
-
-                  {/* 魔法のパーティクル */}
-                  {[...Array(8)].map((_, i) => (
-                    <motion.div
-                      key={`particle-${i}`}
-                      className="absolute"
-                      style={{
-                        left: "30%",
-                        top: "55%",
-                      }}
-                      animate={{
-                        x: [0, (Math.random() - 0.5) * 150],
-                        y: [0, -100 - Math.random() * 50],
-                        opacity: [1, 0],
-                        scale: [0, 1, 0],
-                      }}
-                      transition={{
-                        duration: 2 + Math.random(),
-                        repeat: Infinity,
-                        delay: i * 0.3,
-                      }}
-                    >
-                      <span className="text-2xl">
-                        {["✨", "⭐", "🌟", "💫", "🔮", "💜", "💙", "💖"][i]}
-                      </span>
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                {/* テキストとプログレス */}
-                <motion.div
-                  className="mt-4 text-center z-10"
-                  animate={{ opacity: [0.7, 1, 0.7] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <p className="text-xl font-bold text-gradient mb-2">
-                    🔮 あなたの運命を占っています...
-                  </p>
-                  <p className="text-purple-300 text-sm">
-                    きんまん先生がカードを召喚中
-                  </p>
-                </motion.div>
-                
-                {/* プログレスバー */}
-                <div className="w-full max-w-xs mt-4">
-                  <div className="bg-purple-900/50 rounded-full h-3 mb-2 overflow-hidden">
-                    <motion.div
-                      className="h-3 rounded-full"
-                      style={{
-                        background: "linear-gradient(90deg, #9370db, #ff6b9d, #ffd700)",
-                      }}
-                      initial={{ width: "0%" }}
-                      animate={{ 
-                        width: `${Math.min(generationProgress, 100)}%`,
-                        backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                      }}
-                      transition={{ 
-                        width: { duration: 0.5 },
-                        backgroundPosition: { duration: 2, repeat: Infinity },
-                      }}
-                    />
-                  </div>
-                  <p className="text-purple-400 text-sm text-center">
-                    {Math.round(generationProgress)}% 完了
-                  </p>
-                </div>
-                
-                {/* タイムアウト警告 */}
-                {generationProgress > 70 && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-yellow-400 text-xs mt-4 text-center"
-                  >
-                    ✨ もう少しで完成です...
-                  </motion.p>
-                )}
-              </div>
+              // ローディング表示（きんまん先生の占いアニメーション - AI生成フレーム使用）
+              <FortuneLoadingAnimation progress={generationProgress} />
             )}
           </div>
         </motion.div>
