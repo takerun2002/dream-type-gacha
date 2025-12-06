@@ -134,8 +134,132 @@ function FortuneLoadingAnimation({ progress }: { progress: number }) {
   );
 }
 
+// 待機中のキラキラ位置（固定値）
+const SPARKLE_POSITIONS = [
+  { left: 10, top: 15, duration: 2.5, delay: 0.1 },
+  { left: 85, top: 20, duration: 3.0, delay: 0.3 },
+  { left: 25, top: 80, duration: 2.8, delay: 0.5 },
+  { left: 70, top: 75, duration: 3.2, delay: 0.7 },
+  { left: 45, top: 10, duration: 2.3, delay: 0.9 },
+  { left: 90, top: 50, duration: 2.9, delay: 1.1 },
+  { left: 5, top: 60, duration: 3.1, delay: 1.3 },
+  { left: 60, top: 30, duration: 2.6, delay: 1.5 },
+  { left: 30, top: 45, duration: 2.7, delay: 1.7 },
+  { left: 80, top: 85, duration: 3.3, delay: 1.9 },
+];
+
+// 待機中のUIコンポーネント
+function QueueWaitingAnimation({ 
+  position, 
+  totalWaiting, 
+  estimatedWait 
+}: { 
+  position: number; 
+  totalWaiting: number; 
+  estimatedWait: number;
+}) {
+  return (
+    <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-gradient-to-b from-indigo-900/80 to-purple-900/80 rounded-2xl p-6 overflow-hidden">
+      {/* 背景のキラキラエフェクト */}
+      <div className="absolute inset-0 overflow-hidden">
+        {SPARKLE_POSITIONS.map((pos, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-yellow-400/30 rounded-full"
+            style={{
+              left: `${pos.left}%`,
+              top: `${pos.top}%`,
+            }}
+            animate={{
+              opacity: [0, 1, 0],
+              scale: [0, 1, 0],
+            }}
+            transition={{
+              duration: pos.duration,
+              repeat: Infinity,
+              delay: pos.delay,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* きんまん先生 - 待機中バージョン */}
+      <motion.div
+        className="relative z-10"
+        animate={{ y: [0, -10, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <div className="text-8xl">🔮</div>
+      </motion.div>
+
+      {/* 待機メッセージ */}
+      <motion.div
+        className="mt-6 text-center z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <h3 className="text-xl font-bold text-gradient mb-2">
+          ✨ 少々お待ちください ✨
+        </h3>
+        <p className="text-purple-200 text-sm mb-4">
+          きんまん先生があなたの運命を占う準備をしています
+        </p>
+        
+        {/* 待ち人数表示 */}
+        <motion.div 
+          className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-purple-500/30"
+          animate={{ scale: [1, 1.02, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <div className="text-3xl font-bold text-yellow-400 mb-1">
+            あなたは {position} 番目
+          </div>
+          <div className="text-purple-300 text-sm">
+            現在 {totalWaiting} 人がお待ちです
+          </div>
+          {estimatedWait > 0 && (
+            <div className="text-purple-400/80 text-xs mt-2">
+              予想待ち時間: 約 {Math.ceil(estimatedWait / 60)} 分
+            </div>
+          )}
+        </motion.div>
+
+        {/* 励ましメッセージ */}
+        <motion.p
+          className="mt-4 text-purple-300/80 text-sm"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 3, repeat: Infinity }}
+        >
+          🌟 順番が来たら自動で始まります 🌟
+        </motion.p>
+      </motion.div>
+
+      {/* ローディングドット */}
+      <div className="flex gap-2 mt-4">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-3 h-3 bg-purple-400 rounded-full"
+            animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              delay: i * 0.3,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // カード画像のローカルストレージキー
 const CARD_IMAGE_STORAGE_KEY = "dream_card_image";
+
+// セッションID生成
+const generateSessionId = () => {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+};
 
 export default function ResultPage() {
   const router = useRouter();
@@ -151,6 +275,12 @@ export default function ResultPage() {
   const [cardError, setCardError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  // キュー状態の管理
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [totalWaiting, setTotalWaiting] = useState(0);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [estimatedWait, setEstimatedWait] = useState(0);
+  const [sessionId] = useState(() => generateSessionId());
   // Web Share API対応チェック（クライアントサイドのみ）
   const [canShare, setCanShare] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -217,17 +347,80 @@ export default function ResultPage() {
     return () => clearTimeout(timer);
   }, [router]);
 
+  // キューに参加して順番を待つ
+  const joinQueue = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, action: "join" }),
+      });
+      const data = await response.json();
+      
+      setQueuePosition(data.position || 0);
+      setTotalWaiting(data.totalWaiting || 0);
+      setEstimatedWait(data.estimatedWaitSeconds || 0);
+      
+      return data.canProceed === true;
+    } catch (error) {
+      console.error("Queue join error:", error);
+      return true; // エラー時は即時処理可能として続行
+    }
+  }, [sessionId]);
+
+  // キュー状態をポーリング
+  const pollQueueStatus = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/queue?sessionId=${sessionId}`);
+      const data = await response.json();
+      
+      setQueuePosition(data.position || 0);
+      setTotalWaiting(data.totalWaiting || 0);
+      setEstimatedWait(data.estimatedWaitSeconds || 0);
+      
+      return data.canProceed === true;
+    } catch (error) {
+      console.error("Queue poll error:", error);
+      return true;
+    }
+  }, [sessionId]);
+
+  // キューから離脱
+  const leaveQueue = useCallback(async (action: "complete" | "cancel") => {
+    try {
+      await fetch("/api/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, action }),
+      });
+    } catch (error) {
+      console.error("Queue leave error:", error);
+    }
+  }, [sessionId]);
+
   // カード画像を生成（遊戯王スタイル・Gemini 3 Pro Image方式）
   const generateCard = useCallback(async () => {
     if (!dreamType || !userName || !diagnosisResult) return;
-    if (isGenerating) return; // 二重実行防止
+    if (isGenerating || isWaiting) return; // 二重実行防止
 
     const typeData = dreamTypes[dreamType];
     if (!typeData) return;
 
-    setIsGenerating(true);
     setCardError(null);
     setGenerationProgress(0);
+
+    // キューに参加
+    setIsWaiting(true);
+    let canProceed = await joinQueue();
+
+    // 順番待ち
+    while (!canProceed) {
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3秒ごとにチェック
+      canProceed = await pollQueueStatus();
+    }
+
+    setIsWaiting(false);
+    setIsGenerating(true);
 
     // プログレスアニメーション（疑似的な進捗表示）
     const progressInterval = setInterval(() => {
@@ -304,15 +497,22 @@ export default function ResultPage() {
       } catch (storageError) {
         console.warn("カード画像の保存に失敗:", storageError);
       }
+      
+      // キューから離脱（完了）
+      await leaveQueue("complete");
     } catch (error) {
       clearInterval(progressInterval);
       console.error("カード生成エラー:", error);
       const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました";
       setCardError(errorMessage);
+      
+      // キューから離脱（キャンセル）
+      await leaveQueue("cancel");
     } finally {
       setIsGenerating(false);
+      setIsWaiting(false);
     }
-  }, [dreamType, userName, diagnosisResult, isGenerating]);
+  }, [dreamType, userName, diagnosisResult, isGenerating, isWaiting, joinQueue, leaveQueue, pollQueueStatus]);
 
   // カード生成
   useEffect(() => {
@@ -562,6 +762,13 @@ export default function ResultPage() {
                   ※ エラーが続く場合は、しばらく時間をおいてからお試しください
                 </p>
               </div>
+            ) : isWaiting ? (
+              // 待機中の表示
+              <QueueWaitingAnimation 
+                position={queuePosition || 1} 
+                totalWaiting={totalWaiting} 
+                estimatedWait={estimatedWait}
+              />
             ) : (
               // ローディング表示（きんまん先生の占いアニメーション - AI生成フレーム使用）
               <FortuneLoadingAnimation progress={generationProgress} />
