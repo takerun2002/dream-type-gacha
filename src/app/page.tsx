@@ -117,7 +117,11 @@ export default function Home() {
   // パスワード認証
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.toLowerCase() === SECRET_PASSWORD.toLowerCase()) {
+    const inputPassword = password.trim().toLowerCase();
+    const correctPassword = SECRET_PASSWORD.toLowerCase();
+    console.log("入力:", inputPassword, "正解:", correctPassword);
+    
+    if (inputPassword === correctPassword) {
       setPasswordError(false);
       setStep("welcome");
     } else {
