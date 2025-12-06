@@ -261,13 +261,15 @@ function buildCardPrompt(
 
   return `
 Edit this trading card image with PREMIUM, LUXURIOUS styling.
+OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wallpaper.
 
 === CRITICAL RULES ===
 1. PRESERVE ALL 4 CORNERS of the card frame - DO NOT crop, remove, or white out any corners
 2. Keep the original golden/metallic card border FULLY INTACT
-3. The card must remain a complete rectangle with rounded corners
+3. The card must remain a complete rectangle with rounded corners (PORTRAIT/VERTICAL layout)
 4. DO NOT add any white areas, masks, or cropping to edges
 5. Keep the original character illustration COMPLETELY INTACT
+6. The final image MUST be in PORTRAIT orientation (taller than wide) for iPhone wallpaper use
 
 === CARD LAYOUT ===
 
@@ -395,9 +397,13 @@ async function tryGeminiImageEdit(
           ],
         },
       ],
-      // 画像生成を有効化
+      // 画像生成を有効化（iPhone壁紙用に9:16縦長、2K解像度）
       generationConfig: {
         responseModalities: ["IMAGE", "TEXT"],
+        imageConfig: {
+          aspectRatio: "9:16",
+          imageSize: "2K",
+        },
       },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -438,14 +444,15 @@ async function tryFalImageEdit(
   }
 
   try {
-    // NanoBanana Pro (= Gemini 3 Pro Image)
+    // NanoBanana Pro (= Gemini 3 Pro Image) - iPhone壁紙用に2K解像度
     const result = await fal.subscribe("fal-ai/nano-banana-pro/edit", {
       input: {
         prompt: editPrompt,
         image_urls: [`data:image/png;base64,${cardBase64}`],
         num_images: 1,
         output_format: "png",
-        resolution: "1K",
+        resolution: "2K",
+        aspect_ratio: "9:16",
       },
       logs: true,
       onQueueUpdate: (update) => {

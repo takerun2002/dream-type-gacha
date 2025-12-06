@@ -687,9 +687,9 @@ export default function Home() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="submit"
-                  className="btn-primary flex-1"
+                  className="btn-primary flex-1 whitespace-nowrap"
                 >
-                  診断開始 →
+                  診断開始→
                 </motion.button>
               </div>
             </motion.form>
