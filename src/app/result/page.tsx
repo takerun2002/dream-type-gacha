@@ -134,6 +134,9 @@ function FortuneLoadingAnimation({ progress }: { progress: number }) {
   );
 }
 
+// カード画像のローカルストレージキー
+const CARD_IMAGE_STORAGE_KEY = "dream_card_image";
+
 export default function ResultPage() {
   const router = useRouter();
   const [userName, setUserName] = useState("");
@@ -154,10 +157,18 @@ export default function ResultPage() {
     return isShareSupported();
   });
 
-  // マウント時にWeb Share API対応を再チェック
+  // マウント時にWeb Share API対応を再チェック + 保存済みカード画像を復元
   useEffect(() => {
     if (typeof window !== "undefined") {
       setCanShare(isShareSupported());
+      
+      // 保存済みカード画像を復元
+      const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
+      if (savedCardImage) {
+        setCardImageUrl(savedCardImage);
+        setCardGenerated(true);
+        console.log("📸 保存済みカード画像を復元しました");
+      }
     }
   }, []);
 
@@ -285,6 +296,14 @@ export default function ResultPage() {
       setGenerationProgress(100);
       setCardImageUrl(imageUrl);
       setCardGenerated(true);
+      
+      // カード画像をローカルストレージに保存（再アクセス時に復元用）
+      try {
+        localStorage.setItem(CARD_IMAGE_STORAGE_KEY, imageUrl);
+        console.log("💾 カード画像をローカルストレージに保存しました");
+      } catch (storageError) {
+        console.warn("カード画像の保存に失敗:", storageError);
+      }
     } catch (error) {
       clearInterval(progressInterval);
       console.error("カード生成エラー:", error);

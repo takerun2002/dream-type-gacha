@@ -119,17 +119,22 @@ export default function Home() {
     e.preventDefault();
     const inputPassword = password.trim().toLowerCase();
     const correctPassword = SECRET_PASSWORD.toLowerCase();
-    console.log("入力:", inputPassword, "正解:", correctPassword);
     
     if (inputPassword === correctPassword) {
       setPasswordError(false);
-      setStep("welcome");
+      // 診断済みの場合はリザルトへ、そうでなければウェルカムへ
+      if (isAlreadyDiagnosed) {
+        router.push("/result");
+      } else {
+        setStep("welcome");
+      }
     } else {
       setPasswordError(true);
     }
   };
 
   // 診断済みチェック（おひとり様1回制限）
+  // ※ パスワード認証後にリザルトへ遷移するよう変更
   useEffect(() => {
     const checkDiagnosis = async () => {
       // テストモード: ?test=1 でスキップ（パスワードもスキップ）
@@ -154,8 +159,8 @@ export default function Home() {
           // sessionStorageに復元
           sessionStorage.setItem("userName", result.existingData.userName);
           sessionStorage.setItem("dreamType", result.existingData.dreamType);
-          // 結果画面へリダイレクト
-          router.push("/result");
+          // ※ パスワード画面に留まり、認証後にリダイレクト
+          setCheckingLimit(false);
           return;
         }
       }
