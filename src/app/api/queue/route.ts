@@ -157,7 +157,8 @@ export async function GET(request: Request) {
 }
 
 // キュー状態を取得するヘルパー
-async function getQueueStatus(supabase: ReturnType<typeof createClient>, sessionId: string) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getQueueStatus(supabase: any, sessionId: string) {
   // 現在処理中の数を取得
   const { count: processingCount } = await supabase
     .from("generation_queue")
