@@ -53,6 +53,9 @@ interface DiagnosisResult {
   [key: string]: unknown;
 }
 
+// カード生成のタイムアウト（秒）
+const CARD_GENERATION_TIMEOUT = 60;
+
 export default function ResultPage() {
   const router = useRouter();
   const [userName, setUserName] = useState("");
@@ -63,6 +66,10 @@ export default function ResultPage() {
   const [cardGenerated, setCardGenerated] = useState(false);
   const [cardImageUrl, setCardImageUrl] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // エラー状態の管理
+  const [cardError, setCardError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   // Web Share API対応チェック（クライアントサイドのみ）
   const [canShare, setCanShare] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -79,7 +86,7 @@ export default function ResultPage() {
   useEffect(() => {
     let storedName = sessionStorage.getItem("userName");
     let storedType = sessionStorage.getItem("dreamType");
-    let storedResult = sessionStorage.getItem("diagnosisResult");
+    const storedResult = sessionStorage.getItem("diagnosisResult");
 
     // sessionStorageにない場合、localStorageから復元を試みる
     if (!storedName || !storedType) {
@@ -124,9 +131,29 @@ export default function ResultPage() {
   // カード画像を生成（遊戯王スタイル・Gemini 3 Pro Image方式）
   const generateCard = useCallback(async () => {
     if (!dreamType || !userName || !diagnosisResult) return;
+    if (isGenerating) return; // 二重実行防止
 
     const typeData = dreamTypes[dreamType];
     if (!typeData) return;
+
+    setIsGenerating(true);
+    setCardError(null);
+    setGenerationProgress(0);
+
+    // プログレスアニメーション（疑似的な進捗表示）
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        if (prev >= 90) return prev; // 90%で止める（完了時に100%にする）
+        return prev + Math.random() * 10;
+      });
+    }, 1000);
+
+    // タイムアウト設定
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`カード生成がタイムアウトしました（${CARD_GENERATION_TIMEOUT}秒）`));
+      }, CARD_GENERATION_TIMEOUT * 1000);
+    });
 
     try {
       // 占術データを整形
@@ -170,14 +197,25 @@ export default function ResultPage() {
         fortuneData,
       };
       
-      const imageUrl = await generateCardWithGemini(cardData);
+      // タイムアウト付きでカード生成
+      const imageUrl = await Promise.race([
+        generateCardWithGemini(cardData),
+        timeoutPromise
+      ]);
+      
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
       setCardImageUrl(imageUrl);
       setCardGenerated(true);
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("カード生成エラー:", error);
-      alert("カード生成に失敗しました。もう一度お試しください。");
+      const errorMessage = error instanceof Error ? error.message : "不明なエラーが発生しました";
+      setCardError(errorMessage);
+    } finally {
+      setIsGenerating(false);
     }
-  }, [dreamType, userName, diagnosisResult]);
+  }, [dreamType, userName, diagnosisResult, isGenerating]);
 
   // カード生成
   useEffect(() => {
@@ -220,6 +258,18 @@ export default function ResultPage() {
 
   const typeData = dreamType ? dreamTypes[dreamType] : null;
 
+  // 初期ローディングのタイムアウト管理
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  useEffect(() => {
+    if (!typeData) {
+      const timeout = setTimeout(() => {
+        setLoadingTimeout(true);
+      }, 10000); // 10秒でタイムアウト
+      return () => clearTimeout(timeout);
+    }
+  }, [typeData]);
+
   if (!typeData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-dream">
@@ -227,16 +277,44 @@ export default function ResultPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-center glass-card p-8"
+          className="text-center glass-card p-8 max-w-md"
         >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="text-5xl mb-4"
-          >
-            🔮
-          </motion.div>
-          <p className="text-purple-300">結果を読み込み中...</p>
+          {loadingTimeout ? (
+            // タイムアウト時の表示
+            <>
+              <div className="text-5xl mb-4">😅</div>
+              <h3 className="text-xl font-bold text-yellow-300 mb-2">
+                読み込みに時間がかかっています
+              </h3>
+              <p className="text-purple-300 text-sm mb-4">
+                診断データが見つかりませんでした。<br/>
+                最初から診断をやり直してください。
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  sessionStorage.clear();
+                  router.push("/");
+                }}
+                className="btn-primary w-full"
+              >
+                🏠 最初からやり直す
+              </motion.button>
+            </>
+          ) : (
+            // 通常のローディング表示
+            <>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="text-5xl mb-4"
+              >
+                🔮
+              </motion.div>
+              <p className="text-purple-300">結果を読み込み中...</p>
+            </>
+          )}
         </motion.div>
       </div>
     );
@@ -323,16 +401,80 @@ export default function ResultPage() {
                 }}
                 unoptimized
               />
+            ) : cardError ? (
+              // エラー表示
+              <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-red-900/30 rounded-2xl p-6 border border-red-500/50">
+                <div className="text-5xl mb-4">😢</div>
+                <h3 className="text-xl font-bold text-red-300 mb-2">カード生成エラー</h3>
+                <p className="text-red-200 text-sm text-center mb-4">
+                  {cardError}
+                </p>
+                <div className="flex flex-col gap-3 w-full max-w-xs">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setCardError(null);
+                      setCardGenerated(false);
+                      generateCard();
+                    }}
+                    className="btn-primary w-full"
+                  >
+                    🔄 もう一度試す
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      // セッションをクリアしてホームに戻る
+                      sessionStorage.clear();
+                      router.push("/");
+                    }}
+                    className="btn-secondary w-full"
+                  >
+                    🏠 最初からやり直す
+                  </motion.button>
+                </div>
+                <p className="text-purple-400 text-xs mt-4 text-center">
+                  ※ エラーが続く場合は、しばらく時間をおいてからお試しください
+                </p>
+              </div>
             ) : (
-              <div className="relative w-full max-w-md h-[600px] flex items-center justify-center bg-gray-800/50 rounded-2xl">
+              // ローディング表示（プログレスバー付き）
+              <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-gray-800/50 rounded-2xl p-6">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="text-4xl mb-4"
+                  className="text-5xl mb-4"
                 >
                   ⏳
                 </motion.div>
-                <p className="text-purple-300">カード生成中...</p>
+                <p className="text-purple-300 text-lg mb-4">カード生成中...</p>
+                
+                {/* プログレスバー */}
+                <div className="w-full max-w-xs bg-gray-700/50 rounded-full h-3 mb-2">
+                  <motion.div
+                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full"
+                    initial={{ width: "0%" }}
+                    animate={{ width: `${Math.min(generationProgress, 100)}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <p className="text-purple-400 text-sm">
+                  {Math.round(generationProgress)}% 完了
+                </p>
+                
+                {/* タイムアウト警告 */}
+                {generationProgress > 70 && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-yellow-400 text-xs mt-4 text-center"
+                  >
+                    ⚠️ AI画像生成には時間がかかる場合があります<br/>
+                    しばらくお待ちください...
+                  </motion.p>
+                )}
               </div>
             )}
           </div>
