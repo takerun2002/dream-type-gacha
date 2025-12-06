@@ -423,9 +423,9 @@ export default function Home() {
                 {/* 外側グロー */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-400 rounded-full blur-md opacity-75 group-hover:opacity-100 transition-opacity" />
                 
-                {/* ボタン本体 */}
-                <div className="relative px-14 py-5 bg-gradient-to-b from-yellow-300 via-yellow-500 to-orange-600 rounded-full shadow-[0_6px_0_#92400e,0_8px_25px_rgba(0,0,0,0.5),inset_0_2px_0_rgba(255,255,255,0.4)] transition-all group-hover:shadow-[0_4px_0_#92400e,0_6px_20px_rgba(0,0,0,0.5)] group-active:shadow-[0_0px_0_#92400e] group-active:translate-y-[6px]">
-                  <span className="relative z-10 flex items-center gap-3 text-2xl" style={{
+                {/* ボタン本体 - スマホ対応 */}
+                <div className="relative px-6 py-3 sm:px-14 sm:py-5 bg-gradient-to-b from-yellow-300 via-yellow-500 to-orange-600 rounded-full shadow-[0_4px_0_#92400e,0_6px_20px_rgba(0,0,0,0.5),inset_0_2px_0_rgba(255,255,255,0.4)] sm:shadow-[0_6px_0_#92400e,0_8px_25px_rgba(0,0,0,0.5),inset_0_2px_0_rgba(255,255,255,0.4)] transition-all group-hover:shadow-[0_4px_0_#92400e,0_6px_20px_rgba(0,0,0,0.5)] group-active:shadow-[0_0px_0_#92400e] group-active:translate-y-[4px] sm:group-active:translate-y-[6px]">
+                  <span className="relative z-10 flex items-center gap-2 sm:gap-3 text-base sm:text-2xl" style={{
                     fontFamily: '"Hiragino Mincho ProN", "Yu Mincho", serif',
                     fontWeight: 900,
                     color: '#1a0a00',
@@ -435,7 +435,7 @@ export default function Home() {
                     <motion.span
                       animate={{ rotate: isHovering ? 360 : 0 }}
                       transition={{ duration: 0.5 }}
-                      className="text-3xl"
+                      className="text-xl sm:text-3xl"
                     >
                       🎲
                     </motion.span>
@@ -450,7 +450,7 @@ export default function Home() {
                     <motion.span
                       animate={{ rotate: isHovering ? -360 : 0 }}
                       transition={{ duration: 0.5 }}
-                      className="text-3xl"
+                      className="text-xl sm:text-3xl"
                     >
                       🎲
                     </motion.span>
@@ -634,47 +634,44 @@ export default function Home() {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
               onSubmit={handleBirthDateSubmit}
-              className="glass-card p-8"
+              className="glass-card p-4 sm:p-8"
             >
-              <div className="flex gap-3 mb-6">
-                <div className="flex-1 min-w-[120px]">
+              <div className="flex justify-center gap-2 sm:gap-3 mb-6">
+                <div className="flex flex-col items-center">
                   <select
                     value={birthDate.year}
                     onChange={(e) => setBirthDate({ ...birthDate, year: parseInt(e.target.value) })}
-                    className="input-field text-center w-full"
-                    style={{ minWidth: "100px" }}
+                    className="input-field text-center text-sm sm:text-base w-20 sm:w-24 px-2 py-2"
                   >
                     {years.map((year) => (
                       <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-[#a87890] mt-1 text-center">年</p>
+                  <p className="text-xs text-[#a87890] mt-1">年</p>
                 </div>
-                <div className="min-w-[80px]">
+                <div className="flex flex-col items-center">
                   <select
                     value={birthDate.month}
                     onChange={(e) => setBirthDate({ ...birthDate, month: parseInt(e.target.value) })}
-                    className="input-field text-center w-full"
-                    style={{ minWidth: "70px" }}
+                    className="input-field text-center text-sm sm:text-base w-16 sm:w-20 px-2 py-2"
                   >
                     {months.map((month) => (
                       <option key={month} value={month}>{month}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-[#a87890] mt-1 text-center">月</p>
+                  <p className="text-xs text-[#a87890] mt-1">月</p>
                 </div>
-                <div className="min-w-[80px]">
+                <div className="flex flex-col items-center">
                   <select
                     value={birthDate.day}
                     onChange={(e) => setBirthDate({ ...birthDate, day: parseInt(e.target.value) })}
-                    className="input-field text-center w-full"
-                    style={{ minWidth: "70px" }}
+                    className="input-field text-center text-sm sm:text-base w-16 sm:w-20 px-2 py-2"
                   >
                     {days.map((day) => (
                       <option key={day} value={day}>{day}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-[#a87890] mt-1 text-center">日</p>
+                  <p className="text-xs text-[#a87890] mt-1">日</p>
                 </div>
               </div>
               
