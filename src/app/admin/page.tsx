@@ -116,14 +116,36 @@ export default function AdminPage() {
 
   // 現在のデータ状態を確認
   const checkCurrentData = () => {
+    const diagnosisData = localStorage.getItem("dream_diagnosis_completed");
+    let parsedDiagnosis = null;
+    try {
+      if (diagnosisData) parsedDiagnosis = JSON.parse(diagnosisData);
+    } catch { /* ignore */ }
+
     const data = {
-      診断完了データ: localStorage.getItem("dream_diagnosis_completed") ? "あり" : "なし",
-      フィンガープリント: localStorage.getItem("dream_diagnosis_fp") ? "あり" : "なし",
-      カード画像: localStorage.getItem("dream_card_image") ? "保存済み" : "なし",
+      "【ローカルストレージ】": "---",
+      診断完了データ: diagnosisData ? "あり" : "なし",
+      診断詳細: parsedDiagnosis ? `タイプ: ${parsedDiagnosis.dreamType}, 名前: ${parsedDiagnosis.userName}` : "なし",
+      フィンガープリント: localStorage.getItem("dream_diagnosis_fp") || "なし",
+      カード画像: localStorage.getItem("dream_card_image") ? "保存済み（データあり）" : "なし",
+      "【セッションストレージ】": "---",
       セッション_ユーザー名: sessionStorage.getItem("userName") || "なし",
       セッション_夢タイプ: sessionStorage.getItem("dreamType") || "なし",
+      セッション_診断結果: sessionStorage.getItem("diagnosisResult") ? "あり" : "なし",
     };
-    setClearStatus("📊 現在のデータ:\n" + JSON.stringify(data, null, 2));
+    
+    let statusText = "📊 このデバイスのデータ状態:\n\n";
+    for (const [key, value] of Object.entries(data)) {
+      if (value === "---") {
+        statusText += `\n${key}\n`;
+      } else {
+        statusText += `  ${key}: ${value}\n`;
+      }
+    }
+    statusText += "\n⚠️ 注意: このページでクリアできるのは「このデバイス」のデータのみです。\n";
+    statusText += "スマホのデータをクリアするには、スマホでこのページにアクセスしてください。";
+    
+    setClearStatus(statusText);
   };
 
   if (!isAuthenticated) {

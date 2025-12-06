@@ -170,10 +170,8 @@ export default function Home() {
   }, [router]);
 
   const handleStart = () => {
-    if (isAlreadyDiagnosed) {
-      router.push("/result");
-      return;
-    }
+    // パスワード認証後は診断を開始できる
+    // （診断済みの場合はパスワード認証時にリザルトに遷移済み）
     setStep("name");
   };
 
