@@ -18,13 +18,16 @@ const SpiritualBackground = dynamic(
   }
 );
 
-type Step = "welcome" | "name" | "birthdate" | "questions" | "processing";
+type Step = "password" | "welcome" | "name" | "birthdate" | "questions" | "processing";
 
 interface Answer {
   questionId: number;
   answerId?: string;
   textAnswer?: string;
 }
+
+// 🔐 合言葉（パスワード）設定
+const SECRET_PASSWORD = process.env.NEXT_PUBLIC_ACCESS_PASSWORD || "kinman2024";
 
 // リッチなオーラエフェクトコンポーネント
 function MysticalAura() {
@@ -98,7 +101,9 @@ function MysticalAura() {
 
 export default function Home() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("welcome");
+  const [step, setStep] = useState<Step>("password"); // 最初はパスワード画面
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
   const [userName, setUserName] = useState("");
   const [birthDate, setBirthDate] = useState({ year: 2000, month: 1, day: 1 });
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -109,13 +114,25 @@ export default function Home() {
   const [isAlreadyDiagnosed, setIsAlreadyDiagnosed] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(true);
 
+  // パスワード認証
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password.toLowerCase() === SECRET_PASSWORD.toLowerCase()) {
+      setPasswordError(false);
+      setStep("welcome");
+    } else {
+      setPasswordError(true);
+    }
+  };
+
   // 診断済みチェック（おひとり様1回制限）
   useEffect(() => {
     const checkDiagnosis = async () => {
-      // テストモード: ?test=1 でスキップ
+      // テストモード: ?test=1 でスキップ（パスワードもスキップ）
       const params = new URLSearchParams(window.location.search);
       if (params.get("test") === "1") {
         setCheckingLimit(false);
+        setStep("welcome"); // パスワードをスキップ
         return;
       }
       
@@ -299,6 +316,87 @@ export default function Home() {
       {step === "welcome" && <MysticalAura />}
 
       <AnimatePresence mode="wait">
+        {/* ========== パスワード認証画面 ========== */}
+        {step === "password" && (
+          <motion.div
+            key="password"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+            className="text-center w-full max-w-md px-4 relative z-20"
+          >
+            <div className="glass-card-gold p-8 relative overflow-hidden">
+              {/* キラキラ背景 */}
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-purple-500/10 pointer-events-none" />
+              
+              {/* きんまん先生 */}
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="mb-6"
+              >
+                <Image
+                  src="/images/kinman-standing-transparent.png"
+                  alt="きんまん先生"
+                  width={120}
+                  height={120}
+                  className="mx-auto"
+                />
+              </motion.div>
+              
+              <h1 className="text-2xl font-bold text-gradient mb-2">
+                🔐 合言葉を入力
+              </h1>
+              <p className="text-purple-300 text-sm mb-6">
+                ライブ参加者限定コンテンツです
+              </p>
+              
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <input
+                    type="text"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError(false);
+                    }}
+                    placeholder="合言葉を入力..."
+                    className={`w-full p-4 rounded-xl bg-black/30 border-2 ${
+                      passwordError 
+                        ? 'border-red-500 text-red-300' 
+                        : 'border-purple-500/30 text-white'
+                    } placeholder-purple-400/50 text-center text-lg focus:outline-none focus:border-yellow-500/50 transition-colors`}
+                    autoFocus
+                  />
+                  {passwordError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-red-400 text-sm mt-2"
+                    >
+                      ❌ 合言葉が違います
+                    </motion.p>
+                  )}
+                </div>
+                
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="btn-gold w-full py-4 text-lg"
+                >
+                  ✨ 診断を始める
+                </motion.button>
+              </form>
+              
+              <p className="text-purple-400/60 text-xs mt-4">
+                ※ 合言葉はライブ中にお伝えします
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* ========== ウェルカム画面 - DOPA風リッチデザイン ========== */}
         {step === "welcome" && (
           <motion.div
