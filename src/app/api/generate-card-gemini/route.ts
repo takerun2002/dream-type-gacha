@@ -459,7 +459,7 @@ async function tryFalImageEdit(
 }
 
 /**
- * カード画像を編集（Gemini優先 → FALフォールバック）
+ * カード画像を編集（Gemini優先 → FALフォールバック → 元画像）
  */
 async function editCardWithGemini(
   cardBase64: string,
@@ -481,8 +481,9 @@ async function editCardWithGemini(
     return falResult;
   }
 
-  // 両方失敗した場合
-  throw new Error("画像生成に失敗しました（Gemini API と FAL AI の両方でエラー）");
+  // 3. 両方失敗した場合は元のカード画像をそのまま返す
+  console.log("⚠️ 画像編集APIが利用できないため、元のカード画像を使用します");
+  return cardBase64;
 }
 
 // ==================== API ハンドラー ====================
