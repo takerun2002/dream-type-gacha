@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { fal } from "@fal-ai/client";
+import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 
@@ -27,6 +28,36 @@ const ai = new GoogleGenAI({
 fal.config({
   credentials: process.env.FAL_KEY || "",
 });
+
+// Supabaseクライアント（ログ記録用）
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// ログ記録ヘルパー
+async function logGeneration(
+  userName: string,
+  dreamType: string,
+  success: boolean,
+  errorMessage?: string,
+  apiUsed?: "gemini" | "fal"
+) {
+  if (!supabase) return;
+  
+  try {
+    await supabase.from("generation_logs").insert({
+      user_name: userName,
+      dream_type: dreamType,
+      success,
+      error_message: errorMessage || null,
+      api_used: apiUsed || null,
+    });
+  } catch (error) {
+    console.error("Log recording error:", error);
+  }
+}
 
 // ==================== 型定義 ====================
 
@@ -508,14 +539,17 @@ async function editCardWithGemini(
 // ==================== API ハンドラー ====================
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  let userName = "unknown";
+  let dreamType = "unknown";
+  
   try {
     const body = await request.json();
     const {
-      dreamType,
+      dreamType: dt,
       typeName,
       displayName,
       icon,
-      userName,
+      userName: un,
       element,
       keywords,
       personality,
@@ -524,6 +558,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       fortuneData,
       compatibility,
     } = body as GenerateCardRequest;
+
+    userName = un || "unknown";
+    dreamType = dt || "unknown";
 
     if (!dreamType || !userName || !personalizedMessage) {
       return NextResponse.json(
@@ -572,6 +609,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     console.log(`カード生成完了: ${imageBuffer.length} bytes`);
 
+    // 成功ログ記録
+    await logGeneration(userName, dreamType, true, undefined, "gemini");
+
     return new NextResponse(imageBuffer, {
       status: 200,
       headers: {
@@ -582,10 +622,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     console.error("カード生成エラー:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    // エラーログ記録
+    await logGeneration(userName, dreamType, false, errorMessage);
+
     return NextResponse.json(
       {
         error: "カード生成に失敗しました",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: errorMessage,
       },
       { status: 500 }
     );

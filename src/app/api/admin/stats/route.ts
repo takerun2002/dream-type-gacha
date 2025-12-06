@@ -100,6 +100,25 @@ export async function POST(request: Request) {
       .select("*", { count: "exact", head: true })
       .eq("status", "processing");
 
+    // カード生成ログ（成功/失敗）
+    const { data: generationLogs } = await supabase
+      .from("generation_logs")
+      .select("success, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+
+    const totalGenerations = generationLogs?.length || 0;
+    const successfulGenerations = generationLogs?.filter(log => log.success).length || 0;
+    const successRate = totalGenerations > 0
+      ? (successfulGenerations / totalGenerations) * 100
+      : 0;
+
+    // 最近1時間の生成数
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const recentGenerations = generationLogs?.filter(
+      log => new Date(log.created_at) > oneHourAgo
+    ).length || 0;
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -111,6 +130,13 @@ export async function POST(request: Request) {
         queueStatus: {
           waiting: waitingCount || 0,
           processing: processingCount || 0,
+        },
+        generationStats: {
+          total: totalGenerations,
+          successful: successfulGenerations,
+          failed: totalGenerations - successfulGenerations,
+          successRate: Math.round(successRate * 10) / 10,
+          recentHour: recentGenerations,
         },
       },
     });

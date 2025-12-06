@@ -46,6 +46,13 @@ interface Stats {
     waiting: number;
     processing: number;
   };
+  generationStats: {
+    total: number;
+    successful: number;
+    failed: number;
+    successRate: number;
+    recentHour: number;
+  };
 }
 
 export default function AdminPage() {
@@ -260,6 +267,54 @@ export default function AdminPage() {
                 color="green"
               />
             </div>
+
+            {/* カード生成統計 */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
+            >
+              <h3 className="text-lg font-bold text-purple-300 mb-4">
+                🎴 カード生成統計
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-purple-400 text-sm mb-1">総生成数</p>
+                  <p className="text-2xl font-bold text-white">
+                    {stats.generationStats.total}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-green-400 text-sm mb-1">成功</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {stats.generationStats.successful}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-red-400 text-sm mb-1">失敗</p>
+                  <p className="text-2xl font-bold text-red-400">
+                    {stats.generationStats.failed}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-purple-400 text-sm mb-1">成功率</p>
+                  <p className={`text-2xl font-bold ${
+                    stats.generationStats.successRate >= 90
+                      ? "text-green-400"
+                      : stats.generationStats.successRate >= 70
+                      ? "text-yellow-400"
+                      : "text-red-400"
+                  }`}>
+                    {stats.generationStats.successRate}%
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-purple-500/30">
+                <p className="text-purple-300 text-sm">
+                  過去1時間の生成数: <span className="font-bold text-white">{stats.generationStats.recentHour}</span> 件
+                </p>
+              </div>
+            </motion.div>
 
             {/* タイプ分布グラフ */}
             <motion.div
