@@ -1,6 +1,9 @@
 /**
- * カード画像生成API - Google Gemini API優先 + FAL AIフォールバック
- * NanoBanana Pro (Gemini 2.0 Flash) → FAL AI (nano-banana)
+ * カード画像生成API - Google Gemini API優先 + FAL AI NanoBanana Proフォールバック
+ * 
+ * 正しいモデル名（公式ドキュメント確認済み）:
+ * - Gemini API: gemini-3-pro-image-preview (= NanoBanana Pro相当)
+ * - FAL AI: fal-ai/nano-banana-pro/edit (= Gemini 3 Pro Image)
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,9 +11,6 @@ import { GoogleGenAI } from "@google/genai";
 import { fal } from "@fal-ai/client";
 import fs from "fs";
 import path from "path";
-import satori from "satori";
-import sharp from "sharp";
-import React from "react";
 
 // 🔐 APIキーチェック（サーバーサイドのみ）
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -363,18 +363,24 @@ interface FalNanoBananaResult {
 }
 
 /**
- * Gemini APIで画像編集を試行
+ * Gemini API (gemini-3-pro-image-preview) で画像編集を試行
+ * 公式ドキュメント: https://ai.google.dev/gemini-api/docs/models
  */
 async function tryGeminiImageEdit(
   cardBase64: string,
   editPrompt: string
 ): Promise<string | null> {
-  console.log("🔷 Gemini API (NanoBanana Pro相当) で画像生成を試行...");
+  console.log("🔷 Gemini API (gemini-3-pro-image-preview) で画像生成を試行...");
   
+  if (!GEMINI_API_KEY) {
+    console.error("⚠️ GEMINI_API_KEY が設定されていません");
+    return null;
+  }
+
   try {
-    // Gemini 2.0 Flash experimental (画像生成対応)
+    // Gemini 3 Pro Image Preview（= NanoBanana Pro相当）
     const params = {
-      model: "gemini-2.0-flash-exp-image-generation",
+      model: "gemini-3-pro-image-preview",
       contents: [
         {
           role: "user",
@@ -402,7 +408,7 @@ async function tryGeminiImageEdit(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const partData = part as any;
         if (partData.inlineData?.data) {
-          console.log("✅ Gemini API で画像生成成功！");
+          console.log("✅ Gemini API (gemini-3-pro-image-preview) で画像生成成功！");
           return partData.inlineData.data;
         }
       }
@@ -417,13 +423,14 @@ async function tryGeminiImageEdit(
 }
 
 /**
- * FAL AIで画像編集を試行（フォールバック）
+ * FAL AI (fal-ai/nano-banana-pro/edit) で画像編集を試行（フォールバック）
+ * 公式ドキュメント: https://fal.ai/models/fal-ai/nano-banana-pro/edit/api
  */
 async function tryFalImageEdit(
   cardBase64: string,
   editPrompt: string
 ): Promise<string | null> {
-  console.log("🔶 FAL AI (nano-banana) にフォールバック...");
+  console.log("🔶 FAL AI (fal-ai/nano-banana-pro/edit) にフォールバック...");
   
   if (!process.env.FAL_KEY) {
     console.error("⚠️ FAL_KEY が設定されていません");
@@ -431,12 +438,14 @@ async function tryFalImageEdit(
   }
 
   try {
-    const result = await fal.subscribe("fal-ai/nano-banana/edit", {
+    // NanoBanana Pro (= Gemini 3 Pro Image)
+    const result = await fal.subscribe("fal-ai/nano-banana-pro/edit", {
       input: {
         prompt: editPrompt,
         image_urls: [`data:image/png;base64,${cardBase64}`],
         num_images: 1,
         output_format: "png",
+        resolution: "1K",
       },
       logs: true,
       onQueueUpdate: (update) => {
@@ -447,7 +456,7 @@ async function tryFalImageEdit(
     }) as FalNanoBananaResult;
 
     if (result.data?.images?.[0]?.url) {
-      console.log("✅ FAL AI で画像生成成功！");
+      console.log("✅ FAL AI (nano-banana-pro) で画像生成成功！");
       // URLから画像をBase64に変換
       const imageResponse = await fetch(result.data.images[0].url);
       const imageBuffer = await imageResponse.arrayBuffer();
@@ -462,291 +471,8 @@ async function tryFalImageEdit(
   }
 }
 
-// ==================== Satori フォールバック ====================
-
-// 画像サイズ
-const CARD_WIDTH = 1024;
-const CARD_HEIGHT = 1365;
-
-async function loadFont(): Promise<ArrayBuffer> {
-  const fontPaths = [
-    path.join(process.cwd(), "public", "fonts", "A-OTF-ShinGoPro-Regular.otf"),
-    path.join(process.cwd(), "public", "fonts", "NotoSansJP-Regular.ttf"),
-  ];
-
-  for (const fontPath of fontPaths) {
-    try {
-      const fontBuffer = fs.readFileSync(fontPath);
-      return fontBuffer.buffer.slice(
-        fontBuffer.byteOffset,
-        fontBuffer.byteOffset + fontBuffer.byteLength
-      );
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error("No Japanese font available");
-}
-
-function wrapText(text: string, maxChars: number): string[] {
-  const lines: string[] = [];
-  let currentLine = "";
-  const paragraphs = text.split("\n");
-
-  for (const paragraph of paragraphs) {
-    for (const char of paragraph) {
-      currentLine += char;
-      if (currentLine.length >= maxChars) {
-        lines.push(currentLine);
-        currentLine = "";
-      }
-    }
-    if (currentLine) {
-      lines.push(currentLine);
-      currentLine = "";
-    }
-  }
-
-  return lines;
-}
-
 /**
- * Satori + Sharp でテキストをオーバーレイ（確実なフォールバック）
- */
-async function generateCardWithSatori(
-  cardPath: string,
-  data: GenerateCardRequest,
-  template: CardTemplate,
-  titleAdjective: string
-): Promise<string> {
-  console.log("🔷 Satori + Sharp でカード生成（確実なフォールバック）...");
-
-  try {
-    const fontData = await loadFont();
-    const fullTitle = `${titleAdjective}${data.displayName}タイプ`;
-    const messageLines = wrapText(data.personalizedMessage, 35);
-
-    // 簡易的な五行バランスの可視化テキスト
-    const elementBalance = data.fortuneData?.bazi?.elementBalance || {
-      wood: 2, fire: 3, earth: 2, metal: 1, water: 2
-    };
-    const elementText = `木${elementBalance.wood} 火${elementBalance.fire} 土${elementBalance.earth} 金${elementBalance.metal} 水${elementBalance.water}`;
-
-    // 相性情報
-    const compat = data.compatibility || COMPATIBILITY_MAP[data.dreamType] || {
-      goodTypes: ["不明"], luckyColor: "不明", luckyNumber: "不明"
-    };
-
-    const element = React.createElement(
-      "div",
-      {
-        style: {
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          display: "flex",
-          position: "relative",
-          fontFamily: "NotoSansJP",
-        },
-      },
-      [
-        // ヘッダー: 属性アイコン + タイトル + 五行
-        React.createElement(
-          "div",
-          {
-            key: "header",
-            style: {
-              position: "absolute",
-              left: 28,
-              top: 28,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            },
-          },
-          [
-            // 属性アイコン
-            React.createElement(
-              "div",
-              {
-                key: "icon",
-                style: {
-                  width: 80,
-                  height: 80,
-                  borderRadius: "50%",
-                  backgroundColor: template.primaryColor,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 32,
-                  fontWeight: "bold",
-                  color: "white",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                },
-              },
-              template.attributeKanji
-            ),
-            // タイプ名
-            React.createElement(
-              "div",
-              {
-                key: "title",
-                style: {
-                  backgroundColor: "rgba(0,0,0,0.7)",
-                  color: template.primaryColor,
-                  padding: "8px 16px",
-                  borderRadius: 8,
-                  fontSize: 24,
-                  fontWeight: "bold",
-                  textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                },
-              },
-              fullTitle
-            ),
-          ]
-        ),
-        // 五行バランス（右上）
-        React.createElement(
-          "div",
-          {
-            key: "elements",
-            style: {
-              position: "absolute",
-              right: 28,
-              top: 28,
-              backgroundColor: "rgba(0,0,0,0.7)",
-              color: "#FFD700",
-              padding: "6px 12px",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: "bold",
-            },
-          },
-          elementText
-        ),
-        // メッセージエリア
-        React.createElement(
-          "div",
-          {
-            key: "message",
-            style: {
-              position: "absolute",
-              left: 50,
-              top: 1060,
-              width: 924,
-              height: 260,
-              padding: "16px 20px",
-              backgroundColor: "rgba(255,255,245,0.95)",
-              borderRadius: 12,
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "flex-start",
-              border: `3px solid ${template.primaryColor}`,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
-            },
-          },
-          [
-            // ユーザー名
-            React.createElement(
-              "div",
-              {
-                key: "userName",
-                style: {
-                  fontSize: 20,
-                  fontWeight: "bold",
-                  color: template.primaryColor,
-                  marginBottom: 6,
-                },
-              },
-              `■ ${data.userName}さんへ`
-            ),
-            // 特性・強み
-            React.createElement(
-              "div",
-              {
-                key: "traits",
-                style: {
-                  fontSize: 14,
-                  color: "#333",
-                  marginBottom: 6,
-                  lineHeight: 1.5,
-                },
-              },
-              `▶ 特性：${data.personality || "情熱的な行動力"} | 相性：${compat.goodTypes.join("・")} | 開運色：${compat.luckyColor}`
-            ),
-            // メッセージ本文
-            React.createElement(
-              "div",
-              {
-                key: "messageText",
-                style: {
-                  fontSize: 15,
-                  lineHeight: 1.6,
-                  color: "#333",
-                  whiteSpace: "pre-wrap",
-                },
-              },
-              messageLines.slice(0, 6).join("\n")
-            ),
-          ]
-        ),
-        // フッター
-        React.createElement(
-          "div",
-          {
-            key: "footer",
-            style: {
-              position: "absolute",
-              left: 50,
-              bottom: 20,
-              right: 50,
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 12,
-              color: "#666",
-            },
-          },
-          [
-            React.createElement("span", { key: "left" }, "© きんまん先生 × Dream Note"),
-            React.createElement("span", { key: "right" }, `DTD-${data.dreamType.toUpperCase().substring(0, 3)}001`),
-          ]
-        ),
-      ]
-    );
-
-    const svg = await satori(element, {
-      width: CARD_WIDTH,
-      height: CARD_HEIGHT,
-      fonts: [
-        {
-          name: "NotoSansJP",
-          data: fontData,
-          weight: 400,
-          style: "normal",
-        },
-      ],
-    });
-
-    // ベースカードと合成
-    const cardImagePath = path.join(process.cwd(), "public", cardPath);
-    const baseCard = sharp(cardImagePath);
-    const textOverlayPng = await sharp(Buffer.from(svg)).png().toBuffer();
-
-    const result = await baseCard
-      .composite([{ input: textOverlayPng, top: 0, left: 0 }])
-      .png({ quality: 90 })
-      .toBuffer();
-
-    console.log("✅ Satori + Sharp でカード生成成功！");
-    return result.toString("base64");
-  } catch (error) {
-    console.error("⚠️ Satori フォールバックエラー:", error instanceof Error ? error.message : error);
-    throw error;
-  }
-}
-
-/**
- * カード画像を編集（Gemini優先 → FALフォールバック → Satoriフォールバック）
+ * カード画像を編集（Gemini優先 → FAL AIフォールバック → エラー）
  */
 async function editCardWithGemini(
   cardBase64: string,
@@ -756,27 +482,20 @@ async function editCardWithGemini(
 ): Promise<string> {
   const editPrompt = buildCardPrompt(data, template, titleAdjective);
 
-  // 1. Gemini API (Google) を優先的に試行
+  // 1. Gemini API (gemini-3-pro-image-preview) を優先的に試行
   const geminiResult = await tryGeminiImageEdit(cardBase64, editPrompt);
   if (geminiResult) {
     return geminiResult;
   }
 
-  // 2. エラー時はFAL AIにフォールバック
+  // 2. エラー時はFAL AI (nano-banana-pro/edit) にフォールバック
   const falResult = await tryFalImageEdit(cardBase64, editPrompt);
   if (falResult) {
     return falResult;
   }
 
-  // 3. 両方失敗した場合はSatori + Sharpで確実に生成
-  console.log("⚠️ AI画像編集APIが失敗、Satori + Sharp にフォールバック...");
-  try {
-    return await generateCardWithSatori(template.cardImage, data, template, titleAdjective);
-  } catch {
-    // 最終手段: 元のカード画像を返す
-    console.log("⚠️ 全ての方法が失敗、元のカード画像を使用します");
-    return cardBase64;
-  }
+  // 3. 両方失敗した場合はエラーをスロー
+  throw new Error("画像生成に失敗しました。Gemini APIとFAL AIの両方がエラーを返しました。");
 }
 
 // ==================== API ハンドラー ====================
@@ -869,9 +588,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
     status: "ok",
-    message: "Premium Card Generation API (Google Gemini優先 → FAL AIフォールバック)",
-    primaryAPI: "Google Gemini 2.0 Flash (NanoBanana Pro相当)",
-    fallbackAPI: "FAL AI nano-banana",
+    message: "Premium Card Generation API (Google Gemini優先 → FAL AI NanoBanana Proフォールバック)",
+    primaryAPI: "Google Gemini 3 Pro Image Preview (gemini-3-pro-image-preview)",
+    fallbackAPI: "FAL AI NanoBanana Pro (fal-ai/nano-banana-pro/edit)",
     supportedTypes: Object.keys(CARD_TEMPLATES),
   });
 }
