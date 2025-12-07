@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       // card_image_urlカラムが存在するか確認してからselect
       let query = supabase
         .from("diagnosis_records")
-        .select("id, user_name, dream_type, created_at, fingerprint, ip_address", { count: "exact" });
+        .select("id, user_name, dream_type, created_at, fingerprint, ip_address, card_image_url", { count: "exact" });
       
       // 検索クエリがある場合
       if (searchQuery && searchQuery.trim()) {

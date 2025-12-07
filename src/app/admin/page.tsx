@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 // 管理者パスワード（環境変数で設定可能）
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin2025";
@@ -64,6 +65,7 @@ interface DiagnosisRecord {
   created_at: string;
   fingerprint: string;
   ip_address?: string;
+  card_image_url?: string | null;
 }
 
 interface ErrorLog {
@@ -769,16 +771,31 @@ export default function AdminPage() {
                       className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-purple-500/30 transition-colors"
                     >
                       <div className="flex items-center gap-4">
-                        {/* タイプアイコン */}
-                        <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
-                          style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
-                          onClick={() => openDetailModal(record)}
-                        >
-                          <span className="text-2xl">
-                            {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
-                          </span>
-                        </div>
+                        {/* サムネイル or タイプアイコン */}
+                        {record.card_image_url ? (
+                          <div
+                            className="w-14 h-18 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800"
+                            onClick={() => openDetailModal(record)}
+                          >
+                            <Image
+                              src={record.card_image_url}
+                              alt="カードサムネイル"
+                              width={56}
+                              height={72}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div 
+                            className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
+                            style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
+                            onClick={() => openDetailModal(record)}
+                          >
+                            <span className="text-2xl">
+                              {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                            </span>
+                          </div>
+                        )}
                         <div>
                           <p className="text-white font-medium">{record.user_name}</p>
                           <p className="text-slate-400 text-xs">
@@ -975,6 +992,28 @@ export default function AdminPage() {
                 </div>
                 
                 <div className="space-y-4">
+                  {/* カードプレビュー */}
+                  {selectedRecord.card_image_url && (
+                    <div className="rounded-xl overflow-hidden border border-slate-700">
+                      <Image
+                        src={selectedRecord.card_image_url}
+                        alt="生成カード"
+                        width={600}
+                        height={900}
+                        className="w-full h-auto"
+                        priority
+                      />
+                      <a
+                        href={selectedRecord.card_image_url}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-center py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-sm"
+                      >
+                        🔗 画像を開く / 保存
+                      </a>
+                    </div>
+                  )}
                   {/* タイプ表示 */}
                   <div 
                     className="p-6 rounded-xl flex items-center gap-4"
