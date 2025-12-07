@@ -61,21 +61,51 @@ interface SearchResult {
   dream_type: string;
   created_at: string;
   fingerprint: string;
+  ip_address?: string;
+}
+
+interface ErrorLog {
+  id: string;
+  user_name: string;
+  dream_type: string;
+  success: boolean;
+  error_message?: string;
+  created_at: string;
+}
+
+interface PaginatedRecords {
+  records: SearchResult[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+interface PaginatedLogs {
+  logs: ErrorLog[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "data" | "logs" | "users">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "errors" | "data">("dashboard");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearStatus, setClearStatus] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  // ユーザー検索・削除
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  // 全診断記録
+  const [allRecords, setAllRecords] = useState<PaginatedRecords | null>(null);
+  const [recordsPage, setRecordsPage] = useState(1);
+  const [recordsSearchQuery, setRecordsSearchQuery] = useState("");
+  const [recordsLoading, setRecordsLoading] = useState(false);
+  // エラーログ
+  const [errorLogs, setErrorLogs] = useState<PaginatedLogs | null>(null);
+  const [errorsPage, setErrorsPage] = useState(1);
+  const [errorsLoading, setErrorsLoading] = useState(false);
+  // 削除ステータス
   const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -157,31 +187,66 @@ export default function AdminPage() {
     setClearStatus("✅ 完全リセット完了！");
   };
 
-  // ユーザー検索
-  const searchUsers = async () => {
-    if (!searchQuery.trim()) return;
-    setSearchLoading(true);
-    setDeleteStatus(null);
+  // 全診断記録を取得
+  const fetchAllRecords = useCallback(async (page = 1, search = "") => {
+    setRecordsLoading(true);
     try {
-      const response = await fetch("/api/admin/clear-records", {
+      const response = await fetch("/api/admin/stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: ADMIN_PASSWORD, searchQuery: searchQuery.trim() }),
+        body: JSON.stringify({ 
+          password: ADMIN_PASSWORD, 
+          action: "getAllRecords",
+          page,
+          limit: 30,
+          searchQuery: search
+        }),
       });
       const data = await response.json();
       if (data.success) {
-        setSearchResults(data.records || []);
-        if (data.records?.length === 0) {
-          setDeleteStatus("🔍 該当するユーザーが見つかりません");
-        }
-      } else {
-        setDeleteStatus("❌ " + data.error);
+        setAllRecords({
+          records: data.records,
+          total: data.total,
+          page: data.page,
+          totalPages: data.totalPages,
+        });
+        setRecordsPage(page);
       }
     } catch (error) {
-      setDeleteStatus("❌ 検索に失敗: " + (error as Error).message);
+      console.error("Records fetch error:", error);
     }
-    setSearchLoading(false);
-  };
+    setRecordsLoading(false);
+  }, []);
+
+  // エラーログを取得
+  const fetchErrorLogs = useCallback(async (page = 1) => {
+    setErrorsLoading(true);
+    try {
+      const response = await fetch("/api/admin/stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          password: ADMIN_PASSWORD, 
+          action: "getErrorLogs",
+          page,
+          limit: 30
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setErrorLogs({
+          logs: data.logs,
+          total: data.total,
+          page: data.page,
+          totalPages: data.totalPages,
+        });
+        setErrorsPage(page);
+      }
+    } catch (error) {
+      console.error("Error logs fetch error:", error);
+    }
+    setErrorsLoading(false);
+  }, []);
 
   // ユーザー削除
   const deleteUser = async (userName: string) => {
@@ -198,10 +263,12 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         setDeleteStatus("✅ " + data.message);
-        // 検索結果から削除
-        setSearchResults(prev => prev.filter(r => r.user_name !== userName));
+        // 記録を再取得
+        fetchAllRecords(recordsPage, recordsSearchQuery);
         // 統計を更新
         fetchStats();
+        // 3秒後にメッセージをクリア
+        setTimeout(() => setDeleteStatus(null), 3000);
       } else {
         setDeleteStatus("❌ " + data.error);
       }
@@ -209,6 +276,17 @@ export default function AdminPage() {
       setDeleteStatus("❌ 削除に失敗: " + (error as Error).message);
     }
   };
+
+  // タブ切り替え時にデータを取得
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (activeTab === "records" && !allRecords) {
+        fetchAllRecords(1, "");
+      } else if (activeTab === "errors" && !errorLogs) {
+        fetchErrorLogs(1);
+      }
+    }
+  }, [activeTab, isAuthenticated, allRecords, errorLogs, fetchAllRecords, fetchErrorLogs]);
 
   if (!isAuthenticated) {
     return (
@@ -286,9 +364,9 @@ export default function AdminPage() {
         <div className="flex gap-2 mb-6 flex-wrap">
           {[
             { id: "dashboard", label: "📊 ダッシュボード" },
-            { id: "users", label: "👤 ユーザー管理" },
+            { id: "records", label: "👤 全診断記録" },
+            { id: "errors", label: "⚠️ エラーログ" },
             { id: "data", label: "🗑️ データ管理" },
-            { id: "logs", label: "📋 最近の診断" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -511,134 +589,204 @@ export default function AdminPage() {
           </motion.div>
         )}
 
-        {/* 最近の診断タブ */}
-        {activeTab === "logs" && stats && (
+        {/* 全診断記録タブ */}
+        {activeTab === "records" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
           >
-            <h3 className="text-lg font-bold text-purple-300 mb-4">
-              📋 最近の診断（最新10件）
-            </h3>
-            <div className="space-y-2">
-              {stats.recentDiagnoses.map((diagnosis, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">
-                      {TYPE_NAMES[diagnosis.dream_type]?.split(" ")[0] || "❓"}
-                    </span>
-                    <div>
-                      <p className="text-purple-200 font-medium">
-                        {diagnosis.user_name}
-                      </p>
-                      <p className="text-purple-400/60 text-xs">
-                        {TYPE_NAMES[diagnosis.dream_type] || diagnosis.dream_type}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-purple-300 text-sm">
-                      {new Date(diagnosis.created_at).toLocaleDateString("ja-JP")}
-                    </p>
-                    <p className="text-purple-400/60 text-xs">
-                      {new Date(diagnosis.created_at).toLocaleTimeString("ja-JP")}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-              {stats.recentDiagnoses.length === 0 && (
-                <p className="text-purple-400/60 text-center py-8">
-                  まだ診断記録がありません
-                </p>
-              )}
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-purple-300">
+                👤 全診断記録 {allRecords && `（${allRecords.total}件）`}
+              </h3>
             </div>
-          </motion.div>
-        )}
-
-        {/* ユーザー管理タブ */}
-        {activeTab === "users" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
-          >
-            <h3 className="text-lg font-bold text-purple-300 mb-4">
-              👤 ユーザー検索・削除
-            </h3>
             
             {/* 検索フォーム */}
             <div className="flex gap-2 mb-4">
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchUsers()}
-                placeholder="ユーザー名を入力（部分一致）"
+                value={recordsSearchQuery}
+                onChange={(e) => setRecordsSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && fetchAllRecords(1, recordsSearchQuery)}
+                placeholder="ユーザー名を検索（部分一致）"
                 className="flex-1 p-3 rounded-lg bg-black/30 border border-purple-500/30 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-500"
               />
               <button
-                onClick={searchUsers}
-                disabled={searchLoading}
+                onClick={() => fetchAllRecords(1, recordsSearchQuery)}
+                disabled={recordsLoading}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold transition-colors disabled:opacity-50"
               >
-                {searchLoading ? "🔍..." : "🔍 検索"}
+                {recordsLoading ? "🔍..." : "🔍 検索"}
+              </button>
+              <button
+                onClick={() => {
+                  setRecordsSearchQuery("");
+                  fetchAllRecords(1, "");
+                }}
+                className="px-4 py-3 bg-gray-600/50 hover:bg-gray-600 rounded-lg text-white transition-colors"
+              >
+                クリア
               </button>
             </div>
 
             {/* ステータス表示 */}
             {deleteStatus && (
-              <div className="mb-4 p-3 bg-black/30 rounded-lg border border-purple-500/30">
-                <p className="text-purple-200 text-sm">{deleteStatus}</p>
+              <div className="mb-4 p-3 bg-green-900/30 rounded-lg border border-green-500/30">
+                <p className="text-green-200 text-sm">{deleteStatus}</p>
               </div>
             )}
 
-            {/* 検索結果 */}
-            <div className="space-y-2">
-              {searchResults.map((record) => (
-                <div
-                  key={record.id}
-                  className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">
-                      {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
-                    </span>
-                    <div>
-                      <p className="text-purple-200 font-medium">
-                        {record.user_name}
-                      </p>
-                      <p className="text-purple-400/60 text-xs">
-                        {TYPE_NAMES[record.dream_type] || record.dream_type} ・{" "}
-                        {new Date(record.created_at).toLocaleString("ja-JP")}
-                      </p>
+            {/* 記録一覧 */}
+            {recordsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-purple-300">⏳ 読み込み中...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {allRecords?.records.map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">
+                          {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                        </span>
+                        <div>
+                          <p className="text-purple-200 font-medium">
+                            {record.user_name}
+                          </p>
+                          <p className="text-purple-400/60 text-xs">
+                            {TYPE_NAMES[record.dream_type] || record.dream_type} ・{" "}
+                            {new Date(record.created_at).toLocaleString("ja-JP")}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteUser(record.user_name)}
+                        className="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm font-bold transition-colors"
+                      >
+                        🗑️ 削除
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => deleteUser(record.user_name)}
-                    className="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm font-bold transition-colors"
-                  >
-                    🗑️ 削除
-                  </button>
+                  ))}
+                  {allRecords?.records.length === 0 && (
+                    <p className="text-purple-400/60 text-center py-8">
+                      {recordsSearchQuery ? "検索結果がありません" : "まだ診断記録がありません"}
+                    </p>
+                  )}
                 </div>
-              ))}
-              {searchResults.length === 0 && searchQuery && !searchLoading && (
-                <p className="text-purple-400/60 text-center py-8">
-                  検索結果がありません
-                </p>
-              )}
-              {!searchQuery && (
-                <p className="text-purple-400/60 text-center py-8">
-                  ユーザー名を入力して検索してください
-                </p>
-              )}
+                
+                {/* ページネーション */}
+                {allRecords && allRecords.totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2">
+                    <button
+                      onClick={() => fetchAllRecords(recordsPage - 1, recordsSearchQuery)}
+                      disabled={recordsPage <= 1}
+                      className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← 前
+                    </button>
+                    <span className="text-purple-300 px-4">
+                      {recordsPage} / {allRecords.totalPages}
+                    </span>
+                    <button
+                      onClick={() => fetchAllRecords(recordsPage + 1, recordsSearchQuery)}
+                      disabled={recordsPage >= allRecords.totalPages}
+                      className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      次 →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* エラーログタブ */}
+        {activeTab === "errors" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-purple-300">
+                ⚠️ カード生成エラーログ {errorLogs && `（${errorLogs.total}件）`}
+              </h3>
+              <button
+                onClick={() => fetchErrorLogs(errorsPage)}
+                disabled={errorsLoading}
+                className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white text-sm"
+              >
+                🔄 更新
+              </button>
             </div>
+            
+            {errorsLoading ? (
+              <div className="text-center py-8">
+                <p className="text-purple-300">⏳ 読み込み中...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 mb-4">
+                  {errorLogs?.logs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-3 bg-red-900/20 rounded-lg border border-red-500/30"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="text-red-200 font-medium">
+                            ❌ {log.user_name || "不明"}
+                          </p>
+                          <p className="text-red-400/60 text-xs">
+                            {TYPE_NAMES[log.dream_type] || log.dream_type} ・{" "}
+                            {new Date(log.created_at).toLocaleString("ja-JP")}
+                          </p>
+                        </div>
+                      </div>
+                      {log.error_message && (
+                        <p className="text-red-300 text-sm bg-black/30 p-2 rounded">
+                          {log.error_message}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {errorLogs?.logs.length === 0 && (
+                    <div className="text-center py-8">
+                      <p className="text-green-400">✅ エラーはありません</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* ページネーション */}
+                {errorLogs && errorLogs.totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-2">
+                    <button
+                      onClick={() => fetchErrorLogs(errorsPage - 1)}
+                      disabled={errorsPage <= 1}
+                      className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← 前
+                    </button>
+                    <span className="text-purple-300 px-4">
+                      {errorsPage} / {errorLogs.totalPages}
+                    </span>
+                    <button
+                      onClick={() => fetchErrorLogs(errorsPage + 1)}
+                      disabled={errorsPage >= errorLogs.totalPages}
+                      className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      次 →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </motion.div>
         )}
 

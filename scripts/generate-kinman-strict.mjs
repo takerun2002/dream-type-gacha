@@ -162,3 +162,6 @@ if (frames.length === 3) {
   console.log(`❌ 生成失敗: ${frames.length}/3 フレームのみ生成`);
 }
 
+
+
+

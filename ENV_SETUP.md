@@ -39,3 +39,6 @@ GEMINI_API_KEY=your_key_here
 - `NEXT_PUBLIC_` プレフィックスはフロントエンドに露出するため、機密情報には使用しない
 - Google Cloud ConsoleでAPIキーに制限を設定することを推奨
 
+
+
+

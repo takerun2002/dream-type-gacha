@@ -11,7 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { password } = body;
+    const { password, action, page = 1, limit = 50, searchQuery } = body;
 
     // パスワード認証
     if (password !== ADMIN_PASSWORD) {
@@ -39,7 +39,97 @@ export async function POST(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    // 統計データを取得
+    // アクション別処理
+    if (action === "getAllRecords") {
+      // 全診断記録（ページネーション）
+      const offset = (page - 1) * limit;
+      
+      let query = supabase
+        .from("diagnosis_records")
+        .select("id, user_name, dream_type, created_at, fingerprint, ip_address", { count: "exact" });
+      
+      // 検索クエリがある場合
+      if (searchQuery && searchQuery.trim()) {
+        query = query.ilike("user_name", `%${searchQuery.trim()}%`);
+      }
+      
+      const { data, count, error } = await query
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+      
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: "データ取得に失敗: " + error.message,
+        });
+      }
+      
+      return NextResponse.json({
+        success: true,
+        records: data || [],
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      });
+    }
+
+    if (action === "getErrorLogs") {
+      // エラーログ取得
+      const offset = (page - 1) * limit;
+      
+      const { data, count, error } = await supabase
+        .from("generation_logs")
+        .select("*", { count: "exact" })
+        .eq("success", false)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+      
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: "エラーログ取得に失敗: " + error.message,
+        });
+      }
+      
+      return NextResponse.json({
+        success: true,
+        logs: data || [],
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      });
+    }
+
+    if (action === "getAllLogs") {
+      // 全カード生成ログ取得
+      const offset = (page - 1) * limit;
+      
+      const { data, count, error } = await supabase
+        .from("generation_logs")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+      
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: "ログ取得に失敗: " + error.message,
+        });
+      }
+      
+      return NextResponse.json({
+        success: true,
+        logs: data || [],
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      });
+    }
+
+    // 統計データを取得（デフォルト）
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
