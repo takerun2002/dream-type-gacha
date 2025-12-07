@@ -51,6 +51,7 @@ interface RecordDiagnosisParams {
 
 /**
  * 診断可能かチェック
+ * ⚠️ 重要: フィンガープリントのみで判定（IPアドレスは同一WiFiで共有されるため除外）
  */
 export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
   const fingerprint = await getFingerprint();
@@ -59,17 +60,19 @@ export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
   // 1. Supabaseでチェック（設定されている場合）
   if (isSupabaseConfigured() && supabase) {
     try {
-      // フィンガープリントまたはIPで既存記録をチェック
+      // ⚠️ フィンガープリントのみで既存記録をチェック
+      // IPアドレスでの判定は削除（同一WiFiで別人のデータが返されるバグ対策）
       const { data, error } = await supabase
         .from("diagnosis_records")
-        .select("dream_type, user_name, created_at")
-        .or(`fingerprint.eq.${fingerprint},ip_address.eq.${ipAddress}`)
+        .select("dream_type, user_name, fingerprint, created_at")
+        .eq("fingerprint", fingerprint)
         .limit(1);
 
       if (error) {
         console.error("Supabase check error:", error);
         // DBエラー時はローカルストレージにフォールバック
       } else if (data && data.length > 0) {
+        // フィンガープリントが完全一致した場合のみ「診断済み」
         return {
           canDiagnose: false,
           reason: "already_diagnosed",
@@ -80,7 +83,8 @@ export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
         };
       }
 
-      // レート制限チェック（過去5分以内に同一IPから3回以上）
+      // レート制限チェック（過去5分以内に同一IPから10回以上）
+      // ※ 同一イベント会場での利用を考慮して緩和
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       const { data: recentRecords, error: rateError } = await supabase
         .from("diagnosis_records")
@@ -88,7 +92,7 @@ export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
         .eq("ip_address", ipAddress)
         .gte("created_at", fiveMinutesAgo);
 
-      if (!rateError && recentRecords && recentRecords.length >= 3) {
+      if (!rateError && recentRecords && recentRecords.length >= 10) {
         return {
           canDiagnose: false,
           reason: "rate_limited",
