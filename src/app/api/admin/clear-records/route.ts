@@ -11,7 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { password, fingerprint, clearAll } = body;
+    const { password, fingerprint, clearAll, userName, searchQuery } = body;
 
     // パスワード認証
     if (password !== ADMIN_PASSWORD) {
@@ -75,9 +75,68 @@ export async function POST(request: Request) {
       });
     }
 
+    // ユーザー名で検索
+    if (searchQuery) {
+      const { data, error } = await supabase
+        .from("diagnosis_records")
+        .select("id, user_name, dream_type, created_at, fingerprint")
+        .ilike("user_name", `%${searchQuery}%`)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: "検索に失敗: " + error.message,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        records: data || [],
+        count: data?.length || 0,
+      });
+    }
+
+    // ユーザー名で削除
+    if (userName) {
+      // まず該当レコードを検索
+      const { data: toDelete } = await supabase
+        .from("diagnosis_records")
+        .select("id, user_name")
+        .eq("user_name", userName);
+
+      if (!toDelete || toDelete.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: `「${userName}」さんのレコードが見つかりません`,
+        });
+      }
+
+      // 削除実行
+      const { error } = await supabase
+        .from("diagnosis_records")
+        .delete()
+        .eq("user_name", userName);
+
+      if (error) {
+        return NextResponse.json({
+          success: false,
+          error: "削除に失敗: " + error.message,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `「${userName}」さんの記録を削除しました（${toDelete.length}件）`,
+        deletedCount: toDelete.length,
+        supabaseCleared: true,
+      });
+    }
+
     return NextResponse.json({
       success: false,
-      error: "fingerprint または clearAll を指定してください",
+      error: "fingerprint, userName, searchQuery, または clearAll を指定してください",
     });
   } catch (error) {
     console.error("Admin API error:", error);

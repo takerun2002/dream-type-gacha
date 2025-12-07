@@ -55,15 +55,28 @@ interface Stats {
   };
 }
 
+interface SearchResult {
+  id: string;
+  user_name: string;
+  dream_type: string;
+  created_at: string;
+  fingerprint: string;
+}
+
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "data" | "logs">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "data" | "logs" | "users">("dashboard");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearStatus, setClearStatus] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  // ユーザー検索・削除
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +157,59 @@ export default function AdminPage() {
     setClearStatus("✅ 完全リセット完了！");
   };
 
+  // ユーザー検索
+  const searchUsers = async () => {
+    if (!searchQuery.trim()) return;
+    setSearchLoading(true);
+    setDeleteStatus(null);
+    try {
+      const response = await fetch("/api/admin/clear-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: ADMIN_PASSWORD, searchQuery: searchQuery.trim() }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSearchResults(data.records || []);
+        if (data.records?.length === 0) {
+          setDeleteStatus("🔍 該当するユーザーが見つかりません");
+        }
+      } else {
+        setDeleteStatus("❌ " + data.error);
+      }
+    } catch (error) {
+      setDeleteStatus("❌ 検索に失敗: " + (error as Error).message);
+    }
+    setSearchLoading(false);
+  };
+
+  // ユーザー削除
+  const deleteUser = async (userName: string) => {
+    if (!confirm(`「${userName}」さんの記録を削除しますか？\n\n削除すると、このユーザーは再診断が可能になります。`)) {
+      return;
+    }
+    setDeleteStatus("🔄 削除中...");
+    try {
+      const response = await fetch("/api/admin/clear-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: ADMIN_PASSWORD, userName }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDeleteStatus("✅ " + data.message);
+        // 検索結果から削除
+        setSearchResults(prev => prev.filter(r => r.user_name !== userName));
+        // 統計を更新
+        fetchStats();
+      } else {
+        setDeleteStatus("❌ " + data.error);
+      }
+    } catch (error) {
+      setDeleteStatus("❌ 削除に失敗: " + (error as Error).message);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
@@ -217,9 +283,10 @@ export default function AdminPage() {
         </div>
 
         {/* タブ */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           {[
             { id: "dashboard", label: "📊 ダッシュボード" },
+            { id: "users", label: "👤 ユーザー管理" },
             { id: "data", label: "🗑️ データ管理" },
             { id: "logs", label: "📋 最近の診断" },
           ].map((tab) => (
@@ -489,6 +556,86 @@ export default function AdminPage() {
               {stats.recentDiagnoses.length === 0 && (
                 <p className="text-purple-400/60 text-center py-8">
                   まだ診断記録がありません
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ユーザー管理タブ */}
+        {activeTab === "users" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
+          >
+            <h3 className="text-lg font-bold text-purple-300 mb-4">
+              👤 ユーザー検索・削除
+            </h3>
+            
+            {/* 検索フォーム */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchUsers()}
+                placeholder="ユーザー名を入力（部分一致）"
+                className="flex-1 p-3 rounded-lg bg-black/30 border border-purple-500/30 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={searchUsers}
+                disabled={searchLoading}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold transition-colors disabled:opacity-50"
+              >
+                {searchLoading ? "🔍..." : "🔍 検索"}
+              </button>
+            </div>
+
+            {/* ステータス表示 */}
+            {deleteStatus && (
+              <div className="mb-4 p-3 bg-black/30 rounded-lg border border-purple-500/30">
+                <p className="text-purple-200 text-sm">{deleteStatus}</p>
+              </div>
+            )}
+
+            {/* 検索結果 */}
+            <div className="space-y-2">
+              {searchResults.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                    </span>
+                    <div>
+                      <p className="text-purple-200 font-medium">
+                        {record.user_name}
+                      </p>
+                      <p className="text-purple-400/60 text-xs">
+                        {TYPE_NAMES[record.dream_type] || record.dream_type} ・{" "}
+                        {new Date(record.created_at).toLocaleString("ja-JP")}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => deleteUser(record.user_name)}
+                    className="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm font-bold transition-colors"
+                  >
+                    🗑️ 削除
+                  </button>
+                </div>
+              ))}
+              {searchResults.length === 0 && searchQuery && !searchLoading && (
+                <p className="text-purple-400/60 text-center py-8">
+                  検索結果がありません
+                </p>
+              )}
+              {!searchQuery && (
+                <p className="text-purple-400/60 text-center py-8">
+                  ユーザー名を入力して検索してください
                 </p>
               )}
             </div>
