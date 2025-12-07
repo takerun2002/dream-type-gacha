@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 
 // 管理者パスワード（環境変数で設定可能）
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin2025";
@@ -65,7 +64,6 @@ interface DiagnosisRecord {
   created_at: string;
   fingerprint: string;
   ip_address?: string;
-  card_image_url?: string;
 }
 
 interface ErrorLog {
@@ -771,27 +769,16 @@ export default function AdminPage() {
                       className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-purple-500/30 transition-colors"
                     >
                       <div className="flex items-center gap-4">
-                        {/* カードサムネイル */}
-                        {record.card_image_url ? (
-                          <div 
-                            className="w-12 h-16 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
-                            onClick={() => openDetailModal(record)}
-                          >
-                            <Image
-                              src={record.card_image_url}
-                              alt="カード"
-                              width={48}
-                              height={64}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-12 h-16 bg-slate-800 rounded-lg flex items-center justify-center">
-                            <span className="text-2xl">
-                              {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
-                            </span>
-                          </div>
-                        )}
+                        {/* タイプアイコン */}
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
+                          style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
+                          onClick={() => openDetailModal(record)}
+                        >
+                          <span className="text-2xl">
+                            {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                          </span>
+                        </div>
                         <div>
                           <p className="text-white font-medium">{record.user_name}</p>
                           <p className="text-slate-400 text-xs">
@@ -987,78 +974,56 @@ export default function AdminPage() {
                   </button>
                 </div>
                 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* カードプレビュー */}
-                  <div>
-                    {selectedRecord.card_image_url ? (
-                      <div className="rounded-xl overflow-hidden border border-slate-700">
-                        <Image
-                          src={selectedRecord.card_image_url}
-                          alt="カード"
-                          width={400}
-                          height={560}
-                          className="w-full h-auto"
-                        />
-                      </div>
-                    ) : (
-                      <div className="aspect-[5/7] bg-slate-800 rounded-xl flex items-center justify-center">
-                        <div className="text-center">
-                          <span className="text-6xl block mb-4">
-                            {TYPE_NAMES[selectedRecord.dream_type]?.split(" ")[0] || "❓"}
-                          </span>
-                          <p className="text-slate-500">カード画像なし</p>
-                        </div>
-                      </div>
-                    )}
-                    {selectedRecord.card_image_url && (
-                      <a
-                        href={selectedRecord.card_image_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block mt-3 text-center py-2 bg-purple-600/30 hover:bg-purple-600/50 rounded-lg text-purple-300 text-sm"
-                      >
-                        🔗 元画像を開く
-                      </a>
-                    )}
+                <div className="space-y-4">
+                  {/* タイプ表示 */}
+                  <div 
+                    className="p-6 rounded-xl flex items-center gap-4"
+                    style={{ backgroundColor: TYPE_COLORS[selectedRecord.dream_type] + "20" }}
+                  >
+                    <span className="text-5xl">
+                      {TYPE_NAMES[selectedRecord.dream_type]?.split(" ")[0] || "❓"}
+                    </span>
+                    <div>
+                      <p className="text-white text-2xl font-bold">
+                        {TYPE_NAMES[selectedRecord.dream_type] || selectedRecord.dream_type}
+                      </p>
+                      <p className="text-slate-400">診断タイプ</p>
+                    </div>
                   </div>
                   
                   {/* 詳細情報 */}
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-800/50 rounded-xl p-4">
                       <p className="text-slate-400 text-sm mb-1">ユーザー名</p>
                       <p className="text-white text-lg font-bold">{selectedRecord.user_name}</p>
                     </div>
                     <div className="bg-slate-800/50 rounded-xl p-4">
-                      <p className="text-slate-400 text-sm mb-1">タイプ</p>
-                      <p className="text-white text-lg font-bold">
-                        {TYPE_NAMES[selectedRecord.dream_type] || selectedRecord.dream_type}
-                      </p>
-                    </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
                       <p className="text-slate-400 text-sm mb-1">診断日時</p>
                       <p className="text-white">{new Date(selectedRecord.created_at).toLocaleString("ja-JP")}</p>
                     </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                      <p className="text-slate-400 text-sm mb-1">フィンガープリント</p>
-                      <p className="text-slate-300 text-xs font-mono break-all">{selectedRecord.fingerprint}</p>
-                    </div>
-                    {selectedRecord.ip_address && (
-                      <div className="bg-slate-800/50 rounded-xl p-4">
-                        <p className="text-slate-400 text-sm mb-1">IPアドレス</p>
-                        <p className="text-slate-300 text-sm font-mono">{selectedRecord.ip_address}</p>
-                      </div>
-                    )}
-                    
-                    <button
-                      onClick={() => {
-                        deleteUser(selectedRecord.user_name);
-                        setShowDetailModal(false);
-                      }}
-                      className="w-full py-3 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-xl text-red-300 font-bold transition-colors"
-                    >
-                      🗑️ この記録を削除（再診断を許可）
-                    </button>
                   </div>
+                  
+                  <div className="bg-slate-800/50 rounded-xl p-4">
+                    <p className="text-slate-400 text-sm mb-1">フィンガープリント</p>
+                    <p className="text-slate-300 text-xs font-mono break-all">{selectedRecord.fingerprint}</p>
+                  </div>
+                  
+                  {selectedRecord.ip_address && (
+                    <div className="bg-slate-800/50 rounded-xl p-4">
+                      <p className="text-slate-400 text-sm mb-1">IPアドレス</p>
+                      <p className="text-slate-300 text-sm font-mono">{selectedRecord.ip_address}</p>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={() => {
+                      deleteUser(selectedRecord.user_name);
+                      setShowDetailModal(false);
+                    }}
+                    className="w-full py-3 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-xl text-red-300 font-bold transition-colors"
+                  >
+                    🗑️ この記録を削除（再診断を許可）
+                  </button>
                 </div>
               </div>
             </motion.div>

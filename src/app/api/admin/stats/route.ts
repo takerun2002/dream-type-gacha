@@ -44,9 +44,10 @@ export async function POST(request: Request) {
       // 全診断記録（ページネーション）
       const offset = (page - 1) * limit;
       
+      // card_image_urlカラムが存在するか確認してからselect
       let query = supabase
         .from("diagnosis_records")
-        .select("id, user_name, dream_type, created_at, fingerprint, ip_address, card_image_url", { count: "exact" });
+        .select("id, user_name, dream_type, created_at, fingerprint, ip_address", { count: "exact" });
       
       // 検索クエリがある場合
       if (searchQuery && searchQuery.trim()) {
