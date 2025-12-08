@@ -69,59 +69,83 @@ async function logGeneration(
 }
 
 // カード画像をSupabase Storageにアップロードし、公開URLを返す
+// 優先: service role (adminSupabase)。失敗・未設定時は anon クライアントでフォールバック試行。
 async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType: string): Promise<string | null> {
-  if (!adminSupabase) {
-    console.error("❌ adminSupabase未初期化（SUPABASE_SERVICE_ROLE_KEY が未設定の可能性）");
-    return null;
-  }
-
   const fileName = `${Date.now()}-${encodeURIComponent(userName)}-${dreamType}.png`;
 
-  try {
-    // バケット存在確認
-    const { data: buckets } = await adminSupabase.storage.listBuckets();
-    const cardsExists = buckets?.some(b => b.name === "cards");
-    
-    if (!cardsExists) {
-      console.log("📦 cardsバケットを作成中...");
-      const { error: bucketError } = await adminSupabase.storage.createBucket("cards", { 
-        public: true,
-        fileSizeLimit: 5242880, // 5MB
-        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"]
-      });
-      if (bucketError) {
-        console.error("❌ バケット作成エラー:", bucketError.message);
-        // バケット作成失敗でも続行（既存バケットの可能性）
-      } else {
-        console.log("✅ cardsバケット作成成功");
+  // 1) Service role でアップロード（推奨）
+  if (adminSupabase) {
+    try {
+      // バケット存在確認
+      const { data: buckets } = await adminSupabase.storage.listBuckets();
+      const cardsExists = buckets?.some((b) => b.name === "cards");
+
+      if (!cardsExists) {
+        console.log("📦 cardsバケットを作成中...(service role)");
+        const { error: bucketError } = await adminSupabase.storage.createBucket("cards", {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+          allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
+        });
+        if (bucketError) {
+          console.error("❌ バケット作成エラー (service role):", bucketError.message);
+        } else {
+          console.log("✅ cardsバケット作成成功 (service role)");
+        }
       }
+
+      console.log(`📤 画像アップロード開始 (service role): ${fileName} (${imageBuffer.length} bytes)`);
+
+      const { data: uploadData, error: uploadError } = await adminSupabase.storage
+        .from("cards")
+        .upload(fileName, imageBuffer, {
+          contentType: "image/png",
+          upsert: true, // 同名ファイルは上書き
+        });
+
+      if (!uploadError) {
+        console.log("✅ アップロード成功 (service role):", uploadData?.path);
+        const { data: publicUrlData } = adminSupabase.storage.from("cards").getPublicUrl(fileName);
+        const publicUrl = publicUrlData?.publicUrl || null;
+        console.log("🔗 公開URL:", publicUrl);
+        if (publicUrl) return publicUrl;
+      } else {
+        console.error("❌ Storage upload error (service role):", uploadError.message);
+      }
+    } catch (error) {
+      console.error("❌ Storage upload failed (service role):", error);
     }
-
-    console.log(`📤 画像アップロード開始: ${fileName} (${imageBuffer.length} bytes)`);
-    
-    const { data: uploadData, error: uploadError } = await adminSupabase.storage
-      .from("cards")
-      .upload(fileName, imageBuffer, {
-        contentType: "image/png",
-        upsert: true, // 同名ファイルは上書き
-      });
-
-    if (uploadError) {
-      console.error("❌ Storage upload error:", uploadError.message);
-      return null;
-    }
-
-    console.log("✅ アップロード成功:", uploadData?.path);
-
-    const { data: publicUrlData } = adminSupabase.storage.from("cards").getPublicUrl(fileName);
-    const publicUrl = publicUrlData?.publicUrl || null;
-    console.log("🔗 公開URL:", publicUrl);
-    
-    return publicUrl;
-  } catch (error) {
-    console.error("❌ Storage upload failed:", error);
-    return null;
+  } else {
+    console.error("❌ adminSupabase未初期化（SUPABASE_SERVICE_ROLE_KEY 未設定の可能性）");
   }
+
+  // 2) フォールバック: anon クライアントでアップロード（バケットが既に存在する前提）
+  if (supabase) {
+    try {
+      console.warn("⚠️ service role unavailable. Trying anon upload fallback...");
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("cards")
+        .upload(fileName, imageBuffer, {
+          contentType: "image/png",
+          upsert: true,
+        });
+      if (!uploadError) {
+        console.log("✅ アップロード成功 (anon fallback):", uploadData?.path);
+        const { data: publicUrlData } = supabase.storage.from("cards").getPublicUrl(fileName);
+        const publicUrl = publicUrlData?.publicUrl || null;
+        console.log("🔗 公開URL (anon fallback):", publicUrl);
+        return publicUrl;
+      } else {
+        console.error("❌ Storage upload error (anon fallback):", uploadError.message);
+      }
+    } catch (error) {
+      console.error("❌ Storage upload failed (anon fallback):", error);
+    }
+  } else {
+    console.error("❌ supabase anon client 未初期化（NEXT_PUBLIC_SUPABASE_URL / ANON_KEY 未設定の可能性）");
+  }
+
+  return null;
 }
 
 // ==================== 型定義 ====================
