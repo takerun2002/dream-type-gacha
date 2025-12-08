@@ -357,7 +357,7 @@ function buildCardPrompt(
 
   return `
 Edit this trading card image with PREMIUM, LUXURIOUS styling (高級感・箔押し感・光沢を強調) and keep the original illustration EXACTLY as-is.
-OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wallpaper. DO NOT DOWNSCALE; keep sharpness and high resolution.
+OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wallpaper. DO NOT DOWNSCALE; keep sharpness and high resolution. DO NOT RESIZE CANVAS.
 
 === CRITICAL RULES ===
 1. PRESERVE ALL 4 CORNERS of the card frame - DO NOT crop, remove, or white out any corners
@@ -368,28 +368,31 @@ OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wall
 6. The final image MUST be in PORTRAIT orientation (taller than wide) for iPhone wallpaper use
 7. DO NOT change the main illustration’s pose, proportions, or colors. Preserve lighting and composition; only enhance clarity and metallic sheen.
 8. Make all text, icons, and charts ULTRA SHARP and PRINT-READY (no blur, no watercolor/pastel wash).
+9. DO NOT move, crop, or resize the top header bar or its margin; keep the exact padding so the top edge never cuts the header.
+10. DO NOT move the pentagon radar chart from the top-right header; keep it inside the header box with the same size and spacing.
+11. DO NOT alter gold border thickness or corner radius; keep frame thickness identical.
 
 === CARD LAYOUT ===
 
-【TOP HEADER】
+【TOP HEADER】(位置と余白を絶対に変えない)
 ┌─────────────────────────────────────────────┐
-│ [${template.attributeKanji}]  ${fullTitle}    [PENTAGON]│
+│ [${template.attributeKanji}]  ${fullTitle}    [PENTAGON]│  ← 左の属性丸・中央タイトル・右のレーダーチャートをこの行に収める
 │  ↑                                    ↑      │
 │  LEFT                              RIGHT     │
 │  CIRCLE                            CHART     │
 └─────────────────────────────────────────────┘
 
-LEFT CIRCLE (attribute emblem):
+LEFT CIRCLE (attribute emblem) – 位置とサイズ固定:
 - Place "${template.attributeKanji}" in the LEFT circular area
 - Circle filled with ${template.primaryColor} background
 - "${template.attributeKanji}" in WHITE, BOLD, centered
 - Premium seal/stamp look
 
-CENTER TITLE:
+CENTER TITLE – 位置固定:
 - "${fullTitle}" in elegant Japanese serif font (明朝体)
 - Color: ${template.primaryColor} or dark brown
 
-RIGHT SIDE - PENTAGON RADAR CHART (五行バランス):
+RIGHT SIDE - PENTAGON RADAR CHART (五行バランス) – 位置固定:
 - Draw a small PENTAGON/5-sided radar chart
 - 5 axes labeled: 木(top), 火(top-right), 土(bottom-right), 金(bottom-left), 水(top-left)
 - Values (1-5 scale):
