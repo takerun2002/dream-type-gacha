@@ -10,6 +10,13 @@ const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin202
 // タイプ名のマッピング
 const TYPE_NAMES: Record<string, string> = {
   phoenix: "🔥 不死鳥",
+  butterfly: "🦋 変容の蝶",
+  star: "⭐ 導きの星",
+  spring: "💧 癒しの泉",
+  flame: "🎨 創造の炎",
+  tree: "🌳 知恵の樹",
+  wind: "🌀 冒険の風",
+  shield: "🛡️ 守護の盾",
   dragon: "🐉 龍",
   wolf: "🐺 狼",
   deer: "🦌 鹿",
@@ -22,7 +29,14 @@ const TYPE_NAMES: Record<string, string> = {
 
 // タイプの色
 const TYPE_COLORS: Record<string, string> = {
-  phoenix: "#ff6b6b",
+  phoenix: "#ef4444",
+  butterfly: "#ec4899",
+  star: "#fbbf24",
+  spring: "#06b6d4",
+  flame: "#f97316",
+  tree: "#22c55e",
+  wind: "#8b5cf6",
+  shield: "#3b82f6",
   dragon: "#ffd93d",
   wolf: "#6bcb77",
   deer: "#4d96ff",
@@ -69,13 +83,17 @@ interface DiagnosisRecord {
   card_image_base64?: string | null;
 }
 
-interface ErrorLog {
+interface GenerationLog {
   id: string;
   user_name: string;
   dream_type: string;
   success: boolean;
   error_message?: string;
+  card_image_url?: string | null;
+  card_image_base64?: string | null;
   created_at: string;
+  generation_time_ms?: number;
+  method?: string;
 }
 
 interface PaginatedRecords {
@@ -86,35 +104,97 @@ interface PaginatedRecords {
 }
 
 interface PaginatedLogs {
-  logs: ErrorLog[];
+  logs: GenerationLog[];
   total: number;
   page: number;
   totalPages: number;
+}
+
+// 画像ダウンロード用ヘルパー関数
+function downloadImage(imageData: string, fileName: string) {
+  const link = document.createElement("a");
+
+  if (imageData.startsWith("data:")) {
+    // Base64データの場合
+    link.href = imageData;
+  } else {
+    // URLの場合はそのまま使用
+    link.href = imageData;
+  }
+
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// Base64データをBlobに変換してダウンロード
+async function downloadBase64Image(base64Data: string, fileName: string) {
+  try {
+    // data:image/png;base64, プレフィックスを処理
+    const base64Content = base64Data.includes(",")
+      ? base64Data.split(",")[1]
+      : base64Data;
+
+    const byteCharacters = atob(base64Content);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "image/png" });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download error:", error);
+    alert("ダウンロードに失敗しました");
+  }
 }
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "errors" | "data">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "logs" | "errors" | "data">("dashboard");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearStatus, setClearStatus] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+
   // 全診断記録
   const [allRecords, setAllRecords] = useState<PaginatedRecords | null>(null);
   const [recordsPage, setRecordsPage] = useState(1);
   const [recordsSearchQuery, setRecordsSearchQuery] = useState("");
   const [recordsLoading, setRecordsLoading] = useState(false);
+
+  // カード生成ログ
+  const [generationLogs, setGenerationLogs] = useState<PaginatedLogs | null>(null);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsFilter, setLogsFilter] = useState<"all" | "success" | "failed">("all");
+
   // エラーログ
   const [errorLogs, setErrorLogs] = useState<PaginatedLogs | null>(null);
   const [errorsPage, setErrorsPage] = useState(1);
   const [errorsLoading, setErrorsLoading] = useState(false);
+
   // 削除ステータス
   const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
+
   // 詳細モーダル
   const [selectedRecord, setSelectedRecord] = useState<DiagnosisRecord | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // 画像プレビューモーダル
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewUserName, setPreviewUserName] = useState<string>("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,8 +282,8 @@ export default function AdminPage() {
       const response = await fetch("/api/admin/stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          password: ADMIN_PASSWORD, 
+        body: JSON.stringify({
+          password: ADMIN_PASSWORD,
           action: "getAllRecords",
           page,
           limit: 20,
@@ -226,6 +306,37 @@ export default function AdminPage() {
     setRecordsLoading(false);
   }, []);
 
+  // カード生成ログを取得
+  const fetchGenerationLogs = useCallback(async (page = 1, filter: "all" | "success" | "failed" = "all") => {
+    setLogsLoading(true);
+    try {
+      const response = await fetch("/api/admin/stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: ADMIN_PASSWORD,
+          action: "getAllLogs",
+          page,
+          limit: 20,
+          filter
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setGenerationLogs({
+          logs: data.logs,
+          total: data.total,
+          page: data.page,
+          totalPages: data.totalPages,
+        });
+        setLogsPage(page);
+      }
+    } catch (error) {
+      console.error("Logs fetch error:", error);
+    }
+    setLogsLoading(false);
+  }, []);
+
   // エラーログを取得
   const fetchErrorLogs = useCallback(async (page = 1) => {
     setErrorsLoading(true);
@@ -233,8 +344,8 @@ export default function AdminPage() {
       const response = await fetch("/api/admin/stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          password: ADMIN_PASSWORD, 
+        body: JSON.stringify({
+          password: ADMIN_PASSWORD,
           action: "getErrorLogs",
           page,
           limit: 20
@@ -287,11 +398,18 @@ export default function AdminPage() {
     if (isAuthenticated) {
       if (activeTab === "records" && !allRecords) {
         fetchAllRecords(1, "");
+      } else if (activeTab === "logs" && !generationLogs) {
+        fetchGenerationLogs(1, logsFilter);
       } else if (activeTab === "errors" && !errorLogs) {
         fetchErrorLogs(1);
       }
     }
-  }, [activeTab, isAuthenticated, allRecords, errorLogs, fetchAllRecords, fetchErrorLogs]);
+  }, [activeTab, isAuthenticated, allRecords, generationLogs, errorLogs, fetchAllRecords, fetchGenerationLogs, fetchErrorLogs, logsFilter]);
+
+  // 検索実行（即座に）
+  const handleSearch = () => {
+    fetchAllRecords(1, recordsSearchQuery);
+  };
 
   // 検索クリア
   const handleSearchClear = () => {
@@ -303,6 +421,22 @@ export default function AdminPage() {
   const openDetailModal = (record: DiagnosisRecord) => {
     setSelectedRecord(record);
     setShowDetailModal(true);
+  };
+
+  // 画像プレビューを開く
+  const openImagePreview = (imageUrl: string, userName: string) => {
+    setPreviewImage(imageUrl);
+    setPreviewUserName(userName);
+  };
+
+  // 画像をダウンロード
+  const handleDownloadImage = (imageData: string, userName: string) => {
+    const fileName = `card_${userName}_${Date.now()}.png`;
+    if (imageData.startsWith("data:")) {
+      downloadBase64Image(imageData, fileName);
+    } else {
+      downloadImage(imageData, fileName);
+    }
   };
 
   if (!isAuthenticated) {
@@ -320,7 +454,7 @@ export default function AdminPage() {
             <h1 className="text-2xl font-bold text-white">管理者ログイン</h1>
             <p className="text-slate-400 text-sm mt-2">夢タイプ診断ガチャ</p>
           </div>
-          
+
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
@@ -362,7 +496,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">管理者ダッシュボード</h1>
-                <p className="text-slate-400 text-xs">夢タイプ診断ガチャ</p>
+                <p className="text-slate-400 text-xs">夢タイプ診断ガチャ - クレーム対応完全版</p>
               </div>
             </div>
             <div className="flex gap-3 items-center">
@@ -392,10 +526,11 @@ export default function AdminPage() {
         {/* タブ */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {[
-            { id: "dashboard", label: "📊 ダッシュボード", icon: "📊" },
-            { id: "records", label: "👤 診断記録", icon: "👤" },
-            { id: "errors", label: "⚠️ エラーログ", icon: "⚠️" },
-            { id: "data", label: "🗑️ データ管理", icon: "🗑️" },
+            { id: "dashboard", label: "📊 ダッシュボード" },
+            { id: "records", label: "👤 診断記録・検索" },
+            { id: "logs", label: "🎴 カード生成ログ" },
+            { id: "errors", label: "⚠️ エラーログ" },
+            { id: "data", label: "🗑️ データ管理" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -571,8 +706,8 @@ export default function AdminPage() {
                             animate={{ width: `${percentage}%` }}
                             transition={{ duration: 0.5 }}
                             className="h-full rounded-full flex items-center justify-end pr-3"
-                            style={{ 
-                              background: `linear-gradient(90deg, ${TYPE_COLORS[type] || "#9370db"}88, ${TYPE_COLORS[type] || "#9370db"})` 
+                            style={{
+                              background: `linear-gradient(90deg, ${TYPE_COLORS[type] || "#9370db"}88, ${TYPE_COLORS[type] || "#9370db"})`
                             }}
                           >
                             {percentage > 15 && (
@@ -616,8 +751,8 @@ export default function AdminPage() {
                 {stats.hourlyDistribution.map((count, hour) => {
                   const maxCount = Math.max(...stats.hourlyDistribution, 1);
                   const pvHeight = (count / maxCount) * 100;
-                  const upvHeight = stats.hourlyUniqueDistribution 
-                    ? (stats.hourlyUniqueDistribution[hour] / maxCount) * 100 
+                  const upvHeight = stats.hourlyUniqueDistribution
+                    ? (stats.hourlyUniqueDistribution[hour] / maxCount) * 100
                     : 0;
                   return (
                     <div key={hour} className="flex-1 flex flex-col items-center group relative">
@@ -694,7 +829,7 @@ export default function AdminPage() {
           </motion.div>
         )}
 
-        {/* 全診断記録タブ */}
+        {/* 診断記録・検索タブ */}
         {activeTab === "records" && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -704,7 +839,7 @@ export default function AdminPage() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <span className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-sm">👤</span>
-                診断記録
+                診断記録・ユーザー検索
                 {allRecords && (
                   <span className="ml-2 px-3 py-1 bg-purple-600/30 rounded-full text-purple-300 text-sm">
                     {allRecords.total}件
@@ -718,30 +853,36 @@ export default function AdminPage() {
                 🔄 更新
               </button>
             </div>
-            
-            {/* 検索フォーム */}
-            <div className="flex gap-2 mb-6">
-              <input
-                type="text"
-                value={recordsSearchQuery}
-                onChange={(e) => setRecordsSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchAllRecords(1, recordsSearchQuery)}
-                placeholder="ユーザー名を検索..."
-                className="flex-1 p-3 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
-              />
-              <button
-                onClick={() => fetchAllRecords(1, recordsSearchQuery)}
-                disabled={recordsLoading}
-                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-bold transition-colors disabled:opacity-50"
-              >
-                {recordsLoading ? "⏳" : "🔍"}
-              </button>
-              <button
-                onClick={handleSearchClear}
-                className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-white transition-colors"
-              >
-                クリア
-              </button>
+
+            {/* 検索フォーム - 強調表示 */}
+            <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-xl p-4 mb-6 border border-purple-500/30">
+              <p className="text-purple-200 text-sm mb-3">
+                💡 <strong>クレーム対応用:</strong> ユーザーのニックネームを入力して検索
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={recordsSearchQuery}
+                  onChange={(e) => setRecordsSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                  placeholder="ニックネームを入力..."
+                  className="flex-1 p-3 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-lg"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSearch}
+                  disabled={recordsLoading}
+                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-white font-bold transition-colors disabled:opacity-50"
+                >
+                  {recordsLoading ? "⏳ 検索中..." : "🔍 検索"}
+                </button>
+                <button
+                  onClick={handleSearchClear}
+                  className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-white transition-colors"
+                >
+                  クリア
+                </button>
+              </div>
             </div>
 
             {/* ステータス表示 */}
@@ -759,79 +900,98 @@ export default function AdminPage() {
             {recordsLoading ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">読み込み中...</p>
+                <p className="text-slate-400">検索中...</p>
               </div>
             ) : (
               <>
                 <div className="space-y-3 mb-6">
-                  {allRecords?.records.map((record) => (
-                    <motion.div
-                      key={record.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-purple-500/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        {/* サムネイル or タイプアイコン */}
-                        {record.card_image_url ? (
-                          <div
-                            className="w-14 h-18 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800"
-                            onClick={() => openDetailModal(record)}
-                          >
-                            <Image
-                              src={record.card_image_url}
-                              alt="カードサムネイル"
-                              width={56}
-                              height={72}
-                              className="w-full h-full object-cover"
-                            />
+                  {allRecords?.records.map((record) => {
+                    const hasImage = record.card_image_url || record.card_image_base64;
+                    const imageData = record.card_image_url || record.card_image_base64;
+
+                    return (
+                      <motion.div
+                        key={record.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-purple-500/30 transition-colors"
+                      >
+                        <div className="flex items-center gap-4">
+                          {/* サムネイル or タイプアイコン */}
+                          {hasImage && imageData ? (
+                            <div
+                              className="w-16 h-20 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800 relative"
+                              onClick={() => openImagePreview(imageData, record.user_name)}
+                            >
+                              <Image
+                                src={imageData}
+                                alt="カードサムネイル"
+                                fill
+                                className="object-cover"
+                                unoptimized={imageData.startsWith("data:")}
+                              />
+                              <div className="absolute inset-0 bg-black/0 hover:bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                                <span className="text-white text-xs">🔍</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className="w-14 h-14 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
+                              style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
+                              onClick={() => openDetailModal(record)}
+                            >
+                              <span className="text-2xl">
+                                {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-white font-bold text-lg">{record.user_name}</p>
+                            <p className="text-slate-400 text-sm">
+                              {TYPE_NAMES[record.dream_type] || record.dream_type}
+                            </p>
+                            <p className="text-slate-500 text-xs">
+                              {new Date(record.created_at).toLocaleString("ja-JP")}
+                            </p>
                           </div>
-                        ) : (
-                          <div 
-                            className="w-12 h-12 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
-                            style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
-                            onClick={() => openDetailModal(record)}
-                          >
-                            <span className="text-2xl">
-                              {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
-                            </span>
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-white font-medium">{record.user_name}</p>
-                          <p className="text-slate-400 text-xs">
-                            {TYPE_NAMES[record.dream_type] || record.dream_type}
-                          </p>
-                          <p className="text-slate-500 text-xs">
-                            {new Date(record.created_at).toLocaleString("ja-JP")}
-                          </p>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openDetailModal(record)}
-                          className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-lg text-blue-300 text-sm transition-colors"
-                        >
-                          📋 詳細
-                        </button>
-                        <button
-                          onClick={() => deleteUser(record.user_name)}
-                          className="px-3 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm transition-colors"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          {hasImage && imageData && (
+                            <button
+                              onClick={() => handleDownloadImage(imageData, record.user_name)}
+                              className="px-4 py-2 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 rounded-lg text-emerald-300 text-sm transition-colors flex items-center gap-1"
+                            >
+                              💾 ダウンロード
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openDetailModal(record)}
+                            className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-lg text-blue-300 text-sm transition-colors"
+                          >
+                            📋 詳細
+                          </button>
+                          <button
+                            onClick={() => deleteUser(record.user_name)}
+                            className="px-3 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm transition-colors"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                   {allRecords?.records.length === 0 && (
                     <div className="text-center py-12">
-                      <p className="text-slate-500">
-                        {recordsSearchQuery ? "検索結果がありません" : "診断記録がありません"}
+                      <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-3xl">🔍</span>
+                      </div>
+                      <p className="text-slate-400">
+                        {recordsSearchQuery ? `「${recordsSearchQuery}」に一致する記録がありません` : "診断記録がありません"}
                       </p>
                     </div>
                   )}
                 </div>
-                
+
                 {/* ページネーション */}
                 {allRecords && allRecords.totalPages > 1 && (
                   <div className="flex justify-center items-center gap-4">
@@ -848,6 +1008,156 @@ export default function AdminPage() {
                     <button
                       onClick={() => fetchAllRecords(recordsPage + 1, recordsSearchQuery)}
                       disabled={recordsPage >= allRecords.totalPages}
+                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      次 →
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* カード生成ログタブ */}
+        {activeTab === "logs" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-sm">🎴</span>
+                カード生成ログ
+                {generationLogs && (
+                  <span className="ml-2 px-3 py-1 bg-purple-600/30 rounded-full text-purple-300 text-sm">
+                    {generationLogs.total}件
+                  </span>
+                )}
+              </h3>
+              <div className="flex gap-2">
+                <select
+                  value={logsFilter}
+                  onChange={(e) => {
+                    setLogsFilter(e.target.value as typeof logsFilter);
+                    fetchGenerationLogs(1, e.target.value as typeof logsFilter);
+                  }}
+                  className="px-3 py-2 bg-slate-700 rounded-lg text-white text-sm"
+                >
+                  <option value="all">すべて</option>
+                  <option value="success">成功のみ</option>
+                  <option value="failed">失敗のみ</option>
+                </select>
+                <button
+                  onClick={() => fetchGenerationLogs(logsPage, logsFilter)}
+                  disabled={logsLoading}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
+                >
+                  🔄 更新
+                </button>
+              </div>
+            </div>
+
+            {logsLoading ? (
+              <div className="text-center py-12">
+                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-400">読み込み中...</p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3 mb-6">
+                  {generationLogs?.logs.map((log) => {
+                    const hasImage = log.card_image_url || log.card_image_base64;
+                    const imageData = log.card_image_url || log.card_image_base64;
+
+                    return (
+                      <div
+                        key={log.id}
+                        className={`p-4 rounded-xl border ${
+                          log.success
+                            ? "bg-emerald-900/20 border-emerald-500/30"
+                            : "bg-red-900/20 border-red-500/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-4">
+                            {hasImage && imageData ? (
+                              <div
+                                className="w-12 h-16 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800 relative"
+                                onClick={() => openImagePreview(imageData, log.user_name)}
+                              >
+                                <Image
+                                  src={imageData}
+                                  alt="カード"
+                                  fill
+                                  className="object-cover"
+                                  unoptimized={imageData.startsWith("data:")}
+                                />
+                              </div>
+                            ) : (
+                              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                log.success ? "bg-emerald-600/30" : "bg-red-600/30"
+                              }`}>
+                                <span className="text-xl">{log.success ? "✅" : "❌"}</span>
+                              </div>
+                            )}
+                            <div>
+                              <p className={`font-medium ${log.success ? "text-emerald-200" : "text-red-200"}`}>
+                                {log.success ? "✓ 成功" : "✗ 失敗"} - {log.user_name || "不明"}
+                              </p>
+                              <p className="text-slate-400 text-xs">
+                                {TYPE_NAMES[log.dream_type] || log.dream_type} ・{" "}
+                                {new Date(log.created_at).toLocaleString("ja-JP")}
+                              </p>
+                              {log.generation_time_ms && (
+                                <p className="text-slate-500 text-xs">
+                                  生成時間: {(log.generation_time_ms / 1000).toFixed(1)}秒
+                                  {log.method && ` (${log.method})`}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {hasImage && imageData && (
+                            <button
+                              onClick={() => handleDownloadImage(imageData, log.user_name)}
+                              className="px-3 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 rounded-lg text-emerald-300 text-xs transition-colors"
+                            >
+                              💾
+                            </button>
+                          )}
+                        </div>
+                        {log.error_message && (
+                          <p className="text-red-300 text-sm bg-slate-900/50 p-3 rounded-lg font-mono mt-3">
+                            {log.error_message}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {generationLogs?.logs.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-slate-500">ログがありません</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ページネーション */}
+                {generationLogs && generationLogs.totalPages > 1 && (
+                  <div className="flex justify-center items-center gap-4">
+                    <button
+                      onClick={() => fetchGenerationLogs(logsPage - 1, logsFilter)}
+                      disabled={logsPage <= 1}
+                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← 前
+                    </button>
+                    <span className="text-slate-300">
+                      {logsPage} / {generationLogs.totalPages}
+                    </span>
+                    <button
+                      onClick={() => fetchGenerationLogs(logsPage + 1, logsFilter)}
+                      disabled={logsPage >= generationLogs.totalPages}
                       className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       次 →
@@ -884,7 +1194,7 @@ export default function AdminPage() {
                 🔄 更新
               </button>
             </div>
-            
+
             {errorsLoading ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -925,7 +1235,7 @@ export default function AdminPage() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* ページネーション */}
                 {errorLogs && errorLogs.totalPages > 1 && (
                   <div className="flex justify-center items-center gap-4">
@@ -991,32 +1301,54 @@ export default function AdminPage() {
                     ×
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   {/* カードプレビュー */}
-                  {selectedRecord.card_image_url && (
+                  {(selectedRecord.card_image_url || selectedRecord.card_image_base64) && (
                     <div className="rounded-xl overflow-hidden border border-slate-700">
                       <Image
-                        src={selectedRecord.card_image_url}
+                        src={selectedRecord.card_image_url || selectedRecord.card_image_base64 || ""}
                         alt="生成カード"
                         width={600}
                         height={900}
                         className="w-full h-auto"
                         priority
+                        unoptimized={(selectedRecord.card_image_url || selectedRecord.card_image_base64 || "").startsWith("data:")}
                       />
-                      <a
-                        href={selectedRecord.card_image_url}
-                        download
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-center py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-sm"
-                      >
-                        🔗 画像を開く / 保存
-                      </a>
+                      <div className="flex gap-2 p-2 bg-slate-800">
+                        <button
+                          onClick={() => handleDownloadImage(
+                            selectedRecord.card_image_url || selectedRecord.card_image_base64 || "",
+                            selectedRecord.user_name
+                          )}
+                          className="flex-1 py-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 text-sm rounded-lg transition-colors"
+                        >
+                          💾 画像をダウンロード
+                        </button>
+                        <a
+                          href={selectedRecord.card_image_url || selectedRecord.card_image_base64 || ""}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-sm text-center rounded-lg"
+                        >
+                          🔗 新しいタブで開く
+                        </a>
+                      </div>
                     </div>
                   )}
+
+                  {/* 画像がない場合の警告 */}
+                  {!selectedRecord.card_image_url && !selectedRecord.card_image_base64 && (
+                    <div className="p-4 bg-amber-900/30 rounded-xl border border-amber-500/30">
+                      <p className="text-amber-200 text-sm">
+                        ⚠️ このユーザーのカード画像が見つかりません。
+                        カード生成に失敗した可能性があります。
+                      </p>
+                    </div>
+                  )}
+
                   {/* タイプ表示 */}
-                  <div 
+                  <div
                     className="p-6 rounded-xl flex items-center gap-4"
                     style={{ backgroundColor: TYPE_COLORS[selectedRecord.dream_type] + "20" }}
                   >
@@ -1030,7 +1362,7 @@ export default function AdminPage() {
                       <p className="text-slate-400">診断タイプ</p>
                     </div>
                   </div>
-                  
+
                   {/* 詳細情報 */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-800/50 rounded-xl p-4">
@@ -1042,19 +1374,19 @@ export default function AdminPage() {
                       <p className="text-white">{new Date(selectedRecord.created_at).toLocaleString("ja-JP")}</p>
                     </div>
                   </div>
-                  
+
                   <div className="bg-slate-800/50 rounded-xl p-4">
                     <p className="text-slate-400 text-sm mb-1">フィンガープリント</p>
                     <p className="text-slate-300 text-xs font-mono break-all">{selectedRecord.fingerprint}</p>
                   </div>
-                  
+
                   {selectedRecord.ip_address && (
                     <div className="bg-slate-800/50 rounded-xl p-4">
                       <p className="text-slate-400 text-sm mb-1">IPアドレス</p>
                       <p className="text-slate-300 text-sm font-mono">{selectedRecord.ip_address}</p>
                     </div>
                   )}
-                  
+
                   <button
                     onClick={() => {
                       deleteUser(selectedRecord.user_name);
@@ -1063,6 +1395,61 @@ export default function AdminPage() {
                     className="w-full py-3 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-xl text-red-300 font-bold transition-colors"
                   >
                     🗑️ この記録を削除（再診断を許可）
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 画像プレビューモーダル */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="max-w-lg w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700">
+                <div className="p-3 bg-slate-800 flex justify-between items-center">
+                  <p className="text-white font-medium">{previewUserName}さんのカード</p>
+                  <button
+                    onClick={() => setPreviewImage(null)}
+                    className="text-slate-400 hover:text-white text-xl"
+                  >
+                    ×
+                  </button>
+                </div>
+                <Image
+                  src={previewImage}
+                  alt="カードプレビュー"
+                  width={500}
+                  height={750}
+                  className="w-full h-auto"
+                  unoptimized={previewImage.startsWith("data:")}
+                />
+                <div className="p-3 bg-slate-800 flex gap-2">
+                  <button
+                    onClick={() => handleDownloadImage(previewImage, previewUserName)}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors"
+                  >
+                    💾 ダウンロード
+                  </button>
+                  <button
+                    onClick={() => setPreviewImage(null)}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                  >
+                    閉じる
                   </button>
                 </div>
               </div>
