@@ -70,29 +70,39 @@ export async function POST(request: Request) {
       const userNames = records.map(r => r.user_name);
       
       if (userNames.length > 0) {
-        // generation_logsから各ユーザーの最新の成功ログを取得
+        // generation_logsから各ユーザーの最新の成功ログを取得（URLとBase64の両方）
         const { data: logs } = await supabase
           .from("generation_logs")
-          .select("user_name, card_image_url")
+          .select("user_name, card_image_url, card_image_base64")
           .in("user_name", userNames)
           .eq("success", true)
-          .not("card_image_url", "is", null)
           .order("created_at", { ascending: false });
         
-        // ユーザー名 → card_image_url のマップを作成
-        const imageUrlMap = new Map<string, string>();
+        // ユーザー名 → 画像データ（URL優先、なければBase64）のマップを作成
+        const imageDataMap = new Map<string, { url?: string; base64?: string }>();
         if (logs) {
           for (const log of logs) {
-            if (log.card_image_url && !imageUrlMap.has(log.user_name)) {
-              imageUrlMap.set(log.user_name, log.card_image_url);
+            if (!imageDataMap.has(log.user_name)) {
+              const data: { url?: string; base64?: string } = {};
+              if (log.card_image_url) data.url = log.card_image_url;
+              if (log.card_image_base64) data.base64 = log.card_image_base64;
+              if (data.url || data.base64) {
+                imageDataMap.set(log.user_name, data);
+              }
             }
           }
         }
         
-        // recordsにcard_image_urlを補完
+        // recordsに画像データを補完
         for (const record of records) {
-          if (!record.card_image_url && imageUrlMap.has(record.user_name)) {
-            record.card_image_url = imageUrlMap.get(record.user_name);
+          if (!record.card_image_url && imageDataMap.has(record.user_name)) {
+            const imageData = imageDataMap.get(record.user_name)!;
+            if (imageData.url) {
+              record.card_image_url = imageData.url;
+            } else if (imageData.base64) {
+              // Base64データをcard_image_urlとして使用（管理画面でdata URIとして表示）
+              record.card_image_url = imageData.base64;
+            }
           }
         }
       }
@@ -124,7 +134,7 @@ export async function POST(request: Request) {
         });
       }
       
-      // 該当ユーザーの生成ログも取得（card_image_url含む）
+      // 該当ユーザーの生成ログも取得（card_image_urlとBase64含む）
       const { data: logData } = await supabase
         .from("generation_logs")
         .select("*")
@@ -135,11 +145,12 @@ export async function POST(request: Request) {
       // diagnosis_recordsにcard_image_urlがない場合、generation_logsから補完
       let cardImageUrl = data.card_image_url;
       if (!cardImageUrl && logData) {
-        const successLog = logData.find((log: { success: boolean; card_image_url?: string }) => 
-          log.success && log.card_image_url
+        const successLog = logData.find((log: { success: boolean; card_image_url?: string; card_image_base64?: string }) => 
+          log.success && (log.card_image_url || log.card_image_base64)
         );
         if (successLog) {
-          cardImageUrl = successLog.card_image_url;
+          // URL優先、なければBase64
+          cardImageUrl = successLog.card_image_url || successLog.card_image_base64;
         }
       }
       

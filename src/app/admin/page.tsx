@@ -66,6 +66,7 @@ interface DiagnosisRecord {
   fingerprint: string;
   ip_address?: string;
   card_image_url?: string | null;
+  card_image_base64?: string | null;
 }
 
 interface ErrorLog {

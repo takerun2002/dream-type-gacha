@@ -47,7 +47,8 @@ async function logGeneration(
   success: boolean,
   errorMessage?: string,
   apiUsed?: "gemini" | "fal",
-  cardImageUrl?: string
+  cardImageUrl?: string,
+  cardImageBase64?: string
 ) {
   if (!supabase) return;
   
@@ -61,6 +62,9 @@ async function logGeneration(
     };
     if (cardImageUrl) {
       payload.card_image_url = cardImageUrl;
+    }
+    if (cardImageBase64) {
+      payload.card_image_base64 = cardImageBase64;
     }
     await supabase.from("generation_logs").insert(payload);
   } catch (error) {
@@ -717,12 +721,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error('❌ カード画像の保存に失敗:', e);
     }
 
+    // Base64データも保存（URLが取得できない場合のフォールバック）
+    const cardImageBase64 = `data:image/png;base64,${editedImageBase64}`;
+
     // 診断レコードにも保存（あれば）
-    if (cardImageUrl && adminSupabase) {
+    if (adminSupabase) {
       try {
+        const updateData: { card_image_url?: string; card_image_base64?: string } = {};
+        if (cardImageUrl) updateData.card_image_url = cardImageUrl;
+        updateData.card_image_base64 = cardImageBase64;
+        
         const { error: updateError } = await adminSupabase
           .from('diagnosis_records')
-          .update({ card_image_url: cardImageUrl })
+          .update(updateData)
           .eq('user_name', userName);
         
         if (updateError) {
@@ -735,9 +746,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // 成功ログ記録
+    // 成功ログ記録（Base64も含む）
     console.log(`📝 生成ログ記録: userName=${userName}, dreamType=${dreamType}, cardImageUrl=${cardImageUrl || 'null'}`);
-    await logGeneration(userName, dreamType, true, undefined, 'gemini', cardImageUrl || undefined);
+    await logGeneration(userName, dreamType, true, undefined, 'gemini', cardImageUrl || undefined, cardImageBase64);
 
     return new NextResponse(imageBuffer, {
       status: 200,
