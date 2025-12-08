@@ -40,6 +40,9 @@ const adminSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
+// 🔍 デバッグ: Supabaseクライアント初期化状態
+console.log(`🔍 Supabase初期化状態: supabase=${!!supabase}, adminSupabase=${!!adminSupabase}, hasServiceKey=${!!supabaseServiceKey}`);
+
 // ログ記録ヘルパー（adminSupabaseを優先使用）
 async function logGeneration(
   userName: string,
@@ -50,10 +53,17 @@ async function logGeneration(
   cardImageUrl?: string,
   cardImageBase64?: string
 ) {
+  console.log(`🔍 logGeneration呼び出し: userName=${userName}, dreamType=${dreamType}, success=${success}`);
+  console.log(`🔍 logGeneration パラメータ: cardImageUrl=${cardImageUrl ? 'あり(' + cardImageUrl.substring(0, 50) + '...)' : 'なし'}`);
+  console.log(`🔍 logGeneration パラメータ: cardImageBase64=${cardImageBase64 ? 'あり(' + cardImageBase64.length + '文字)' : 'なし'}`);
+
   // adminSupabase（service role）を優先、なければ通常のsupabaseを使用
   const client = adminSupabase || supabase;
+  const clientType = adminSupabase ? 'adminSupabase(service_role)' : (supabase ? 'supabase(anon)' : 'なし');
+  console.log(`🔍 使用クライアント: ${clientType}`);
+
   if (!client) {
-    console.error("❌ logGeneration: Supabaseクライアントが未初期化");
+    console.error("❌ logGeneration: Supabaseクライアントが未初期化 - 保存をスキップ");
     return;
   }
 
@@ -71,20 +81,27 @@ async function logGeneration(
     if (cardImageBase64) {
       payload.card_image_base64 = cardImageBase64;
       console.log(`📦 Base64データサイズ: ${cardImageBase64.length} 文字`);
+    } else {
+      console.warn(`⚠️ cardImageBase64がundefined/nullです！`);
     }
 
     console.log(`📝 generation_logs にInsert開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
+    console.log(`📝 payloadキー: ${Object.keys(payload).join(', ')}`);
 
     const { data, error } = await client.from("generation_logs").insert(payload).select();
 
     if (error) {
       console.error("❌ generation_logs Insert エラー:", error.message);
+      console.error("❌ エラーコード:", error.code);
       console.error("❌ エラー詳細:", JSON.stringify(error));
     } else {
-      console.log("✅ generation_logs Insert 成功:", data);
+      console.log("✅ generation_logs Insert 成功:", JSON.stringify(data));
     }
   } catch (error) {
     console.error("❌ Log recording error:", error);
+    if (error instanceof Error) {
+      console.error("❌ エラースタック:", error.stack);
+    }
   }
 }
 
@@ -742,13 +759,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // 診断レコードにも保存（あれば）
     const dbClient = adminSupabase || supabase;
+    const dbClientType = adminSupabase ? 'adminSupabase(service_role)' : (supabase ? 'supabase(anon)' : 'なし');
+    console.log(`🔍 diagnosis_records更新 使用クライアント: ${dbClientType}`);
+
     if (dbClient) {
       try {
         const updateData: { card_image_url?: string; card_image_base64?: string } = {};
         if (cardImageUrl) updateData.card_image_url = cardImageUrl;
         updateData.card_image_base64 = cardImageBase64;
 
-        console.log(`📝 diagnosis_records 更新開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
+        console.log(`📝 diagnosis_records 更新開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}, base64Length=${cardImageBase64.length}`);
+        console.log(`📝 updateDataキー: ${Object.keys(updateData).join(', ')}`);
 
         const { data: updateResult, error: updateError } = await dbClient
           .from('diagnosis_records')
@@ -758,12 +779,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         if (updateError) {
           console.error('❌ diagnosis_records 更新エラー:', updateError.message);
+          console.error('❌ エラーコード:', updateError.code);
           console.error('❌ エラー詳細:', JSON.stringify(updateError));
         } else {
-          console.log(`✅ diagnosis_records 更新成功:`, updateResult);
+          console.log(`✅ diagnosis_records 更新成功: 更新件数=${updateResult?.length || 0}`);
+          if (updateResult && updateResult.length > 0) {
+            console.log(`✅ 更新されたレコードID: ${updateResult.map((r: { id?: string | number }) => r.id).join(', ')}`);
+          } else {
+            console.warn(`⚠️ diagnosis_records 更新: 該当レコードが0件（userName="${userName}" が存在しない可能性）`);
+          }
         }
       } catch (e) {
         console.error('❌ diagnosis_records 更新に失敗:', e);
+        if (e instanceof Error) {
+          console.error('❌ エラースタック:', e.stack);
+        }
       }
     } else {
       console.error('❌ diagnosis_records 更新スキップ: Supabaseクライアントなし');
