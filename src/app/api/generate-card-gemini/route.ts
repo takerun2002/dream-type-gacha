@@ -40,7 +40,7 @@ const adminSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
 
-// ログ記録ヘルパー
+// ログ記録ヘルパー（adminSupabaseを優先使用）
 async function logGeneration(
   userName: string,
   dreamType: string,
@@ -50,8 +50,13 @@ async function logGeneration(
   cardImageUrl?: string,
   cardImageBase64?: string
 ) {
-  if (!supabase) return;
-  
+  // adminSupabase（service role）を優先、なければ通常のsupabaseを使用
+  const client = adminSupabase || supabase;
+  if (!client) {
+    console.error("❌ logGeneration: Supabaseクライアントが未初期化");
+    return;
+  }
+
   try {
     const payload: Record<string, unknown> = {
       user_name: userName,
@@ -65,10 +70,21 @@ async function logGeneration(
     }
     if (cardImageBase64) {
       payload.card_image_base64 = cardImageBase64;
+      console.log(`📦 Base64データサイズ: ${cardImageBase64.length} 文字`);
     }
-    await supabase.from("generation_logs").insert(payload);
+
+    console.log(`📝 generation_logs にInsert開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
+
+    const { data, error } = await client.from("generation_logs").insert(payload).select();
+
+    if (error) {
+      console.error("❌ generation_logs Insert エラー:", error.message);
+      console.error("❌ エラー詳細:", JSON.stringify(error));
+    } else {
+      console.log("✅ generation_logs Insert 成功:", data);
+    }
   } catch (error) {
-    console.error("Log recording error:", error);
+    console.error("❌ Log recording error:", error);
   }
 }
 
@@ -725,25 +741,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cardImageBase64 = `data:image/png;base64,${editedImageBase64}`;
 
     // 診断レコードにも保存（あれば）
-    if (adminSupabase) {
+    const dbClient = adminSupabase || supabase;
+    if (dbClient) {
       try {
         const updateData: { card_image_url?: string; card_image_base64?: string } = {};
         if (cardImageUrl) updateData.card_image_url = cardImageUrl;
         updateData.card_image_base64 = cardImageBase64;
-        
-        const { error: updateError } = await adminSupabase
+
+        console.log(`📝 diagnosis_records 更新開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
+
+        const { data: updateResult, error: updateError } = await dbClient
           .from('diagnosis_records')
           .update(updateData)
-          .eq('user_name', userName);
-        
+          .eq('user_name', userName)
+          .select();
+
         if (updateError) {
-          console.error('❌ 診断レコード更新エラー:', updateError.message);
+          console.error('❌ diagnosis_records 更新エラー:', updateError.message);
+          console.error('❌ エラー詳細:', JSON.stringify(updateError));
         } else {
-          console.log(`✅ 診断レコード更新成功: ${userName}`);
+          console.log(`✅ diagnosis_records 更新成功:`, updateResult);
         }
       } catch (e) {
-        console.error('❌ 診断レコード更新に失敗:', e);
+        console.error('❌ diagnosis_records 更新に失敗:', e);
       }
+    } else {
+      console.error('❌ diagnosis_records 更新スキップ: Supabaseクライアントなし');
     }
 
     // 成功ログ記録（Base64も含む）
