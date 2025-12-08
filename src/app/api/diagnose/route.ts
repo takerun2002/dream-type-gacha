@@ -147,21 +147,29 @@ ${Object.entries(scores)
 }
 
 export async function POST(request: NextRequest) {
+  console.log("🔍 [diagnose] POST開始");
   try {
+    console.log("🔍 [diagnose] リクエストボディ解析中...");
     const body = await request.json();
+    console.log("🔍 [diagnose] ボディ取得OK:", JSON.stringify(body).substring(0, 200));
     const { name, answers, birthDate } = body;
 
     if (!name || !answers || !Array.isArray(answers)) {
+      console.log("🔍 [diagnose] バリデーションエラー: name or answers missing");
       return NextResponse.json(
         { success: false, error: "名前と回答が必要です" },
         { status: 400 }
       );
     }
 
+    console.log("🔍 [diagnose] calculateResult呼び出し...");
     // 質問回答から診断結果を計算
     const resultType = calculateResult(answers);
+    console.log("🔍 [diagnose] resultType:", resultType);
     const scores = calculateScores(answers);
+    console.log("🔍 [diagnose] scores OK");
     const typeData = dreamTypes[resultType];
+    console.log("🔍 [diagnose] typeData:", typeData ? "OK" : "NULL");
 
     if (!typeData) {
       return NextResponse.json(
