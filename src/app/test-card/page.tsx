@@ -24,8 +24,8 @@ export default function TestCardPage() {
           dreamTypeDisplayName: "不死鳥", // 新しい表示名
           personalizedMessage: "あなたは不死鳥タイプです。どんな困難からも蘇る力を持っています。引き寄せノートには、過去に乗り越えた困難と、そこから得た強さを書き出してみましょう。",
           color: dreamTypes.phoenix.color,
-          frameColor: dreamTypes.phoenix.frameColor,
-          cardImageUrl: dreamTypes.phoenix.cardImage,
+          frameColor: dreamTypes.phoenix.color,
+          cardImageUrl: `/cards/kinman-phoenix.png`,
         };
 
         await generateCardV2(canvasRef.current, testData);

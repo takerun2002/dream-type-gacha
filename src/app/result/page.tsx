@@ -52,10 +52,8 @@ interface FortuneData {
 interface DiagnosisResult {
   dreamType: string;
   typeName: string;
-  typeNameEn: string;
   personalizedMessage: string;
   color: string;
-  frameColor: string;
   fortuneData?: FortuneData;
   [key: string]: unknown;
 }
@@ -462,14 +460,14 @@ export default function ResultPage() {
         // 基本情報
         dreamType: typeData.id,
         typeName: typeData.name,
-        displayName: typeData.displayName, // 不死鳥、妖狐等
+        displayName: typeData.name, // 不死鳥、妖狐等
         icon: typeData.icon,
         userName,
         
         // タイプ詳細
-        element: typeData.element,
+        element: typeData.id, // elementは存在しないためidを使用
         keywords: typeData.keywords,
-        personality: typeData.personality,
+        personality: typeData.description, // personalityは存在しないためdescriptionを使用
         strengths: typeData.strengths,
         
         // 診断結果
@@ -823,7 +821,6 @@ export default function ResultPage() {
           >
             {typeData.name}
           </h2>
-          <p className="text-purple-300 text-sm mb-4">{typeData.nameEn}</p>
 
           {/* キーワードタグ */}
           <div className="flex flex-wrap justify-center gap-2 mb-4">

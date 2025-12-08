@@ -91,7 +91,7 @@ async function generatePersonalizedMessage(
 
 【ユーザー情報】
 名前: ${userName}
-診断結果: ${dreamType.name}（${dreamType.nameEn}）
+診断結果: ${dreamType.name}
 タイプの特徴: ${dreamType.keywords.join("、")}
 ${dreamType.description}
 ${fourPillarsInfo}
@@ -212,14 +212,9 @@ export async function POST(request: NextRequest) {
       result: {
         dreamType: finalDreamType,
         typeName: finalTypeData.name,
-        typeNameEn: finalTypeData.nameEn,
         icon: finalTypeData.icon,
         color: finalTypeData.color,
-        frameColor: finalTypeData.frameColor,
-        cardImage: finalTypeData.cardImage,
-        element: finalTypeData.element,
         keywords: finalTypeData.keywords,
-        personality: finalTypeData.personality,
         description: finalTypeData.description,
         strengths: finalTypeData.strengths,
         advice: finalTypeData.advice,

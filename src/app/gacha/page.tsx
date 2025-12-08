@@ -281,7 +281,7 @@ export default function GachaPage() {
                     className="w-full h-full relative overflow-hidden rounded-2xl"
                   >
                     <Image
-                      src={typeData.cardImage}
+                      src={`/cards/kinman-${typeData.id}.png`}
                       alt={typeData.name}
                       fill
                       className="object-cover"
@@ -331,7 +331,7 @@ export default function GachaPage() {
               className="mb-6 relative w-[260px] h-[370px] mx-auto"
             >
               <Image
-                src={typeData.cardImage}
+                src={`/cards/kinman-${typeData.id}.png`}
                 alt={typeData.name}
                 fill
                 className="object-contain rounded-2xl"
@@ -363,15 +363,6 @@ export default function GachaPage() {
             >
               {typeData.icon} {typeData.name}
             </motion.h2>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-purple-300 text-sm mb-4"
-            >
-              {typeData.nameEn}
-            </motion.p>
 
             {/* ローディング */}
             <motion.div

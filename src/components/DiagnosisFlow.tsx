@@ -209,7 +209,7 @@ function TypeSpecificStage({ dreamType, typeColor }: { dreamType: string; typeCo
             transition={{ delay: 0.5 }}
             style={{ textShadow: `0 0 20px ${typeColor}` }}
           >
-            {typeData?.displayName || dreamType}タイプ
+            {typeData?.name || dreamType}タイプ
           </motion.h2>
         </motion.div>
 
@@ -446,7 +446,7 @@ export function DiagnosisFlow({ result, onComplete }: DiagnosisFlowProps) {
     } catch (error) {
       console.error('Failed to generate card:', error);
       // フォールバック: タイプのカード画像を使用
-      setCardImage(typeData?.cardImage || '/images/fallback-card.png');
+      setCardImage(typeData ? `/cards/kinman-${typeData.id}.png` : '/images/fallback-card.png');
     } finally {
       setIsGenerating(false);
     }
