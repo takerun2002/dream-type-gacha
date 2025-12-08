@@ -70,30 +70,56 @@ async function logGeneration(
 
 // カード画像をSupabase Storageにアップロードし、公開URLを返す
 async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType: string): Promise<string | null> {
-  if (!adminSupabase) return null;
+  if (!adminSupabase) {
+    console.error("❌ adminSupabase未初期化（SUPABASE_SERVICE_ROLE_KEY が未設定の可能性）");
+    return null;
+  }
 
   const fileName = `${Date.now()}-${encodeURIComponent(userName)}-${dreamType}.png`;
 
   try {
-    // バケットが無ければ作成（public）
-    await adminSupabase.storage.createBucket("cards", { public: true }).catch(() => {});
+    // バケット存在確認
+    const { data: buckets } = await adminSupabase.storage.listBuckets();
+    const cardsExists = buckets?.some(b => b.name === "cards");
+    
+    if (!cardsExists) {
+      console.log("📦 cardsバケットを作成中...");
+      const { error: bucketError } = await adminSupabase.storage.createBucket("cards", { 
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"]
+      });
+      if (bucketError) {
+        console.error("❌ バケット作成エラー:", bucketError.message);
+        // バケット作成失敗でも続行（既存バケットの可能性）
+      } else {
+        console.log("✅ cardsバケット作成成功");
+      }
+    }
 
-    const { error: uploadError } = await adminSupabase.storage
+    console.log(`📤 画像アップロード開始: ${fileName} (${imageBuffer.length} bytes)`);
+    
+    const { data: uploadData, error: uploadError } = await adminSupabase.storage
       .from("cards")
       .upload(fileName, imageBuffer, {
         contentType: "image/png",
-        upsert: false,
+        upsert: true, // 同名ファイルは上書き
       });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError.message);
+      console.error("❌ Storage upload error:", uploadError.message);
       return null;
     }
 
+    console.log("✅ アップロード成功:", uploadData?.path);
+
     const { data: publicUrlData } = adminSupabase.storage.from("cards").getPublicUrl(fileName);
-    return publicUrlData?.publicUrl || null;
+    const publicUrl = publicUrlData?.publicUrl || null;
+    console.log("🔗 公開URL:", publicUrl);
+    
+    return publicUrl;
   } catch (error) {
-    console.error("Storage upload failed:", error);
+    console.error("❌ Storage upload failed:", error);
     return null;
   }
 }
@@ -646,29 +672,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const imageBuffer = Buffer.from(editedImageBase64, "base64");
 
-    console.log(`カード生成完了: ${imageBuffer.length} bytes`);
+    console.log(`✅ カード生成完了: ${imageBuffer.length} bytes for ${userName}`);
 
     // 生成画像をストレージに保存して公開URLを取得
     let cardImageUrl: string | null = null;
     try {
+      console.log("📦 画像のストレージ保存を開始...");
       cardImageUrl = await uploadCardImage(imageBuffer, userName, dreamType);
+      if (cardImageUrl) {
+        console.log(`✅ 画像保存成功: ${cardImageUrl}`);
+      } else {
+        console.warn("⚠️ 画像保存がnullを返しました（バケット未作成の可能性）");
+      }
     } catch (e) {
-      console.error('カード画像の保存に失敗:', e);
+      console.error('❌ カード画像の保存に失敗:', e);
     }
 
     // 診断レコードにも保存（あれば）
     if (cardImageUrl && adminSupabase) {
       try {
-        await adminSupabase
+        const { error: updateError } = await adminSupabase
           .from('diagnosis_records')
           .update({ card_image_url: cardImageUrl })
           .eq('user_name', userName);
+        
+        if (updateError) {
+          console.error('❌ 診断レコード更新エラー:', updateError.message);
+        } else {
+          console.log(`✅ 診断レコード更新成功: ${userName}`);
+        }
       } catch (e) {
-        console.error('診断レコード更新に失敗:', e);
+        console.error('❌ 診断レコード更新に失敗:', e);
       }
     }
 
     // 成功ログ記録
+    console.log(`📝 生成ログ記録: userName=${userName}, dreamType=${dreamType}, cardImageUrl=${cardImageUrl || 'null'}`);
     await logGeneration(userName, dreamType, true, undefined, 'gemini', cardImageUrl || undefined);
 
     return new NextResponse(imageBuffer, {
