@@ -1,13 +1,26 @@
+console.log("🔍 [diagnose] モジュール読み込み開始");
+
 import { NextRequest, NextResponse } from "next/server";
+console.log("🔍 [diagnose] next/server OK");
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
+console.log("🔍 [diagnose] @google/generative-ai OK");
+
 import { dreamTypes } from "@/lib/dreamTypes";
+console.log("🔍 [diagnose] dreamTypes OK");
+
 import { calculateResult, calculateScores } from "@/lib/questions";
+console.log("🔍 [diagnose] questions OK");
+
 import { calculateDailyStem, FourPillarsData } from "@/lib/fourPillars";
-import { 
-  DreamTypeDiagnosisEngine, 
+console.log("🔍 [diagnose] fourPillars OK");
+
+import {
+  DreamTypeDiagnosisEngine,
   FortuneDiagnosisResult,
-  ELEMENT_INFO 
+  ELEMENT_INFO
 } from "@/lib/fortuneEngine";
+console.log("🔍 [diagnose] fortuneEngine OK - 全モジュール読み込み完了");
 
 // 🔐 APIキーチェック（サーバーサイドのみ）
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
