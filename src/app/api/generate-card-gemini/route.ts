@@ -356,8 +356,8 @@ function buildCardPrompt(
   const fullTitle = `${titleAdjective}${data.displayName}タイプ`;
 
   return `
-Edit this trading card image with PREMIUM, LUXURIOUS styling.
-OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wallpaper.
+Edit this trading card image with PREMIUM, LUXURIOUS styling (高級感・箔押し感・光沢を強調) and keep the original illustration EXACTLY as-is.
+OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wallpaper. DO NOT DOWNSCALE; keep sharpness and high resolution.
 
 === CRITICAL RULES ===
 1. PRESERVE ALL 4 CORNERS of the card frame - DO NOT crop, remove, or white out any corners
@@ -366,6 +366,8 @@ OUTPUT: PORTRAIT ORIENTATION (9:16 aspect ratio) - optimized for smartphone wall
 4. DO NOT add any white areas, masks, or cropping to edges
 5. Keep the original character illustration COMPLETELY INTACT
 6. The final image MUST be in PORTRAIT orientation (taller than wide) for iPhone wallpaper use
+7. DO NOT change the main illustration’s pose, proportions, or colors. Preserve lighting and composition; only enhance clarity and metallic sheen.
+8. Make all text, icons, and charts ULTRA SHARP and PRINT-READY (no blur, no watercolor/pastel wash).
 
 === CARD LAYOUT ===
 
