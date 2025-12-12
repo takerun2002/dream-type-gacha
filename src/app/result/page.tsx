@@ -291,12 +291,11 @@ export default function ResultPage() {
     if (typeof window !== "undefined") {
       setCanShare(isShareSupported());
       
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore',message:'カード画像復元開始',data:{storageKey:CARD_IMAGE_STORAGE_KEY},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1-restore'})}).catch(()=>{});
-      // #endregion
+      console.log("🔍 [DEBUG v12] カード画像復元処理開始");
       
       // 保存済みカード画像を復元
       const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
+      console.log("🔍 [DEBUG v12] savedCardImage:", savedCardImage ? `${savedCardImage.substring(0, 50)}... (${savedCardImage.length}文字)` : "null");
       
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-check',message:'localStorage取得結果',data:{hasSavedImage:!!savedCardImage,savedImageLength:savedCardImage?.length||0,savedImagePrefix:savedCardImage?.substring(0,100)||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-storage'})}).catch(()=>{});
