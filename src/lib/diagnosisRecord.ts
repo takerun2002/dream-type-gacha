@@ -207,5 +207,42 @@ export function resetDiagnosisRecord(): void {
   console.log("診断記録をリセットしました（ローカルのみ）");
 }
 
+/**
+ * Supabaseから保存済みのカード画像URLを取得
+ * localStorageの復元が失敗した場合のフォールバック用
+ */
+export async function getSavedCardImageUrl(): Promise<string | null> {
+  const fingerprint = await getFingerprint();
+  
+  if (!isSupabaseConfigured() || !supabase) {
+    console.log("⚠️ Supabaseが設定されていません");
+    return null;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from("diagnosis_records")
+      .select("card_image_url")
+      .eq("fingerprint", fingerprint)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    
+    if (error) {
+      console.error("Supabase card image fetch error:", error);
+      return null;
+    }
+    
+    if (data && data.length > 0 && data[0].card_image_url) {
+      console.log("✅ Supabaseからカード画像URLを取得:", data[0].card_image_url.substring(0, 80));
+      return data[0].card_image_url;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("getSavedCardImageUrl error:", error);
+    return null;
+  }
+}
+
 
 

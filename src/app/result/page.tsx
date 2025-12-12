@@ -7,7 +7,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { dreamTypes } from "@/lib/dreamTypes";
 import { generateCardWithGemini, downloadCardGemini, isShareSupported, type CardDataGemini } from "@/lib/cardGeneratorGemini";
-import { getSavedDiagnosisData } from "@/lib/diagnosisRecord";
+import { getSavedDiagnosisData, getSavedCardImageUrl } from "@/lib/diagnosisRecord";
 import Confetti from "@/components/Confetti";
 
 // Three.js背景を動的インポート（SSR無効）
@@ -288,50 +288,59 @@ export default function ResultPage() {
 
   // マウント時にWeb Share API対応を再チェック + 保存済みカード画像を復元
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const restoreCardImage = async () => {
+      if (typeof window === "undefined") return;
+      
       setCanShare(isShareSupported());
+      console.log("🔍 [DEBUG v13] カード画像復元処理開始");
       
-      console.log("🔍 [DEBUG v12] カード画像復元処理開始");
-      
-      // 保存済みカード画像を復元
+      // Step 1: localStorageから復元を試みる
       const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
-      console.log("🔍 [DEBUG v12] savedCardImage:", savedCardImage ? `${savedCardImage.substring(0, 50)}... (${savedCardImage.length}文字)` : "null");
+      console.log("🔍 [DEBUG v13] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
       
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-check',message:'localStorage取得結果',data:{hasSavedImage:!!savedCardImage,savedImageLength:savedCardImage?.length||0,savedImagePrefix:savedCardImage?.substring(0,100)||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-storage'})}).catch(()=>{});
-      // #endregion
-      
-      if (savedCardImage) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-check-type',message:'保存データタイプ確認',data:{isBase64:savedCardImage.startsWith('data:'),isBlob:savedCardImage.startsWith('blob:'),urlStart:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
-        // #endregion
-        
-        // Base64形式（data:image/...）のみ有効、Blob URLは無効
-        if (savedCardImage.startsWith('data:')) {
-          setCardImageUrl(savedCardImage);
-          setCardGenerated(true);
-          console.log("📸 保存済みBase64カード画像を復元しました");
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-success',message:'Base64カード画像復元成功',data:{base64Length:savedCardImage.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
-          // #endregion
-        } else {
-          // 古いBlob URLまたはその他の無効なURLは無視してクリア
-          console.log("⚠️ 古いBlob URLを検出、クリアして再生成へ");
-          localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
-          setCardImageUrl(null);  // ★重要: URLをnullにしてImageコンポーネントを非表示に
-          setCardGenerated(false); // ★重要: 再生成トリガー
-          
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-blob-cleared',message:'古いBlob URLをクリア、状態リセット',data:{clearedUrl:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H11-statereset'})}).catch(()=>{});
-          // #endregion
-        }
-      } else {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-empty',message:'保存済み画像なし',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-storage'})}).catch(()=>{});
-        // #endregion
+      // Base64形式（data:image/...）は有効
+      if (savedCardImage && savedCardImage.startsWith('data:')) {
+        setCardImageUrl(savedCardImage);
+        setCardGenerated(true);
+        console.log("✅ localStorageからBase64画像を復元");
+        return;
       }
-    }
+      
+      // 永続的なURL（https://...supabase.co/...）も有効
+      if (savedCardImage && savedCardImage.startsWith('https://')) {
+        setCardImageUrl(savedCardImage);
+        setCardGenerated(true);
+        console.log("✅ localStorageからSupabase URLを復元");
+        return;
+      }
+      
+      // 古いBlob URLはクリア
+      if (savedCardImage && savedCardImage.startsWith('blob:')) {
+        console.log("⚠️ 古いBlob URLを検出、クリアします");
+        localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
+      }
+      
+      // Step 2: Supabaseから復元を試みる（フォールバック）
+      console.log("🔍 [DEBUG v13] Supabaseからカード画像URL取得を試みます");
+      try {
+        const supabaseImageUrl = await getSavedCardImageUrl();
+        if (supabaseImageUrl) {
+          setCardImageUrl(supabaseImageUrl);
+          setCardGenerated(true);
+          // 取得したURLをlocalStorageにも保存（次回用）
+          localStorage.setItem(CARD_IMAGE_STORAGE_KEY, supabaseImageUrl);
+          console.log("✅ Supabaseからカード画像URLを復元:", supabaseImageUrl.substring(0, 60));
+          return;
+        }
+      } catch (error) {
+        console.error("Supabaseからの復元に失敗:", error);
+      }
+      
+      // Step 3: どちらも失敗した場合は再生成を待つ（cardGenerated=falseのまま）
+      console.log("🔍 [DEBUG v13] 保存済み画像なし、再生成を待機");
+    };
+    
+    restoreCardImage();
   }, []);
 
   useEffect(() => {
