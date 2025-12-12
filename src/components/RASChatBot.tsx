@@ -384,25 +384,39 @@ export default function RASChatBot() {
       case "greeting":
         return (
           <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                <Image src={RAS_IMAGES.greeting} alt="RASくん" width={40} height={40} className="object-cover" />
+            <div className="flex gap-3 items-start">
+              <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 15px rgba(255, 165, 0, 0.4)" }}>
+                <div className="w-full h-full border-2 border-orange-400/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                  <Image src={RAS_IMAGES.greeting} alt="RASくん" width={44} height={44} className="object-cover rounded-full" />
+                </div>
               </div>
-              <div className="flex-1 bg-white/95 rounded-2xl rounded-tl-sm p-3 text-gray-800 shadow-lg">
-                <p className="text-sm leading-relaxed">
-                  こんにちは！オペレーターRASくんです。
+              <div
+                className="flex-1 rounded-2xl rounded-tl-sm p-4 shadow-xl"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                  boxShadow: "0 4px 20px rgba(201, 75, 124, 0.15), 0 0 40px rgba(255, 200, 220, 0.1)"
+                }}
+              >
+                <p className="text-sm leading-relaxed text-gray-700">
+                  <span className="text-lg">👋</span> こんにちは！
+                  <br />
+                  <span className="font-bold text-pink-600">オペレーターRASくん</span>です。
                   <br /><br />
                   どのようなことでお困りですか？
                   <br />
-                  下のボタンから選んでください。
+                  <span className="text-gray-500 text-xs">下のボタンから選んでください✨</span>
                 </p>
               </div>
             </div>
             <button
               onClick={() => setStep("category_select")}
-              className="w-full py-3 bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-opacity"
+              className="w-full py-3.5 text-white rounded-xl font-bold shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)",
+                boxShadow: "0 4px 15px rgba(201, 75, 124, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+              }}
             >
-              質問カテゴリを選ぶ
+              🔍 質問カテゴリを選ぶ
             </button>
           </div>
         );
@@ -410,34 +424,61 @@ export default function RASChatBot() {
       case "category_select":
         return (
           <div className="space-y-3">
-            <div className="flex gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                <Image src={RAS_IMAGES.explaining} alt="RASくん" width={40} height={40} className="object-cover" />
+            <div className="flex gap-3 items-start mb-4">
+              <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 12px rgba(255, 165, 0, 0.4)" }}>
+                <div className="w-full h-full border-2 border-orange-400/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                  <Image src={RAS_IMAGES.explaining} alt="RASくん" width={40} height={40} className="object-cover rounded-full" />
+                </div>
               </div>
-              <div className="flex-1 bg-white/95 rounded-2xl rounded-tl-sm p-3 text-gray-800 shadow-lg">
-                <p className="text-sm leading-relaxed">
-                  どんなことでお困りですか？
+              <div
+                className="flex-1 rounded-2xl rounded-tl-sm p-3 shadow-lg"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                  boxShadow: "0 4px 15px rgba(201, 75, 124, 0.12)"
+                }}
+              >
+                <p className="text-sm leading-relaxed text-gray-700">
+                  どんなことでお困りですか？ 🤔
                 </p>
               </div>
             </div>
 
-            {CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => selectCategory(category)}
-                className="w-full py-3 px-4 bg-white/10 hover:bg-white/20 border border-orange-400/30 rounded-xl text-white text-left flex items-center gap-3 transition-colors"
-              >
-                <span className="text-xl">{category.icon}</span>
-                <span className="text-sm">{category.label}</span>
-              </button>
-            ))}
+            <div className="space-y-2">
+              {CATEGORIES.map((category, index) => (
+                <button
+                  key={category.id}
+                  onClick={() => selectCategory(category)}
+                  className="w-full py-3 px-4 rounded-xl text-left flex items-center gap-3 transition-all duration-200 hover:scale-[1.02] hover:translate-x-1"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(45, 16, 40, 0.8) 0%, rgba(35, 12, 35, 0.9) 100%)",
+                    border: "1px solid rgba(201, 75, 124, 0.3)",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+                    animationDelay: `${index * 50}ms`
+                  }}
+                >
+                  <span className="text-xl w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: "rgba(201, 75, 124, 0.2)" }}>
+                    {category.icon}
+                  </span>
+                  <span className="text-sm text-pink-100/90">{category.label}</span>
+                  <span className="ml-auto text-pink-400/50">›</span>
+                </button>
+              ))}
+            </div>
 
             <button
               onClick={selectOther}
-              className="w-full py-3 px-4 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-400/50 rounded-xl text-orange-300 text-left flex items-center gap-3 transition-colors"
+              className="w-full py-3 px-4 rounded-xl text-left flex items-center gap-3 transition-all duration-200 hover:scale-[1.02] mt-3"
+              style={{
+                background: "linear-gradient(135deg, rgba(212, 165, 116, 0.15) 0%, rgba(201, 75, 124, 0.1) 100%)",
+                border: "2px solid rgba(212, 165, 116, 0.4)",
+                boxShadow: "0 0 15px rgba(212, 165, 116, 0.15)"
+              }}
             >
-              <span className="text-xl">❓</span>
-              <span className="text-sm">その他（上記に該当しない）</span>
+              <span className="text-xl w-8 h-8 flex items-center justify-center rounded-lg" style={{ background: "rgba(212, 165, 116, 0.2)" }}>
+                ❓
+              </span>
+              <span className="text-sm font-medium" style={{ color: "#d4a574" }}>その他（上記に該当しない）</span>
+              <span className="ml-auto" style={{ color: "rgba(212, 165, 116, 0.6)" }}>›</span>
             </button>
           </div>
         );
@@ -448,48 +489,88 @@ export default function RASChatBot() {
 
         return (
           <div className="space-y-4">
-            {/* カテゴリ表示 */}
-            <div className="flex items-center gap-2 text-orange-300 text-sm">
+            {/* カテゴリ表示 - バッジスタイル */}
+            <div
+              className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full"
+              style={{
+                background: "linear-gradient(135deg, rgba(201, 75, 124, 0.2) 0%, rgba(155, 75, 138, 0.15) 100%)",
+                border: "1px solid rgba(201, 75, 124, 0.3)"
+              }}
+            >
               <span>{selectedCategory.icon}</span>
-              <span>{selectedCategory.label}</span>
-              <span className="text-orange-400/60">({currentFaqIndex + 1}/{selectedCategory.faqs.length})</span>
+              <span className="text-pink-200/90">{selectedCategory.label}</span>
+              <span
+                className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: "rgba(212, 165, 116, 0.3)", color: "#d4a574" }}
+              >
+                {currentFaqIndex + 1}/{selectedCategory.faqs.length}
+              </span>
             </div>
 
-            {/* FAQ */}
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                <Image src={RAS_IMAGES.explaining} alt="RASくん" width={40} height={40} className="object-cover" />
+            {/* FAQ - カード形式 */}
+            <div className="flex gap-3 items-start">
+              <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 12px rgba(255, 165, 0, 0.4)" }}>
+                <div className="w-full h-full border-2 border-orange-400/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                  <Image src={RAS_IMAGES.explaining} alt="RASくん" width={40} height={40} className="object-cover rounded-full" />
+                </div>
               </div>
-              <div className="flex-1 bg-white/95 rounded-2xl rounded-tl-sm p-4 text-gray-800 shadow-lg">
-                <p className="font-bold text-sm mb-2 text-orange-600">
-                  Q. {currentFaq.question}
+              <div
+                className="flex-1 rounded-2xl rounded-tl-sm p-4 shadow-xl"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                  boxShadow: "0 4px 20px rgba(201, 75, 124, 0.15)"
+                }}
+              >
+                <p
+                  className="font-bold text-sm mb-3 pb-2"
+                  style={{
+                    color: "#c94b7c",
+                    borderBottom: "1px dashed rgba(201, 75, 124, 0.3)"
+                  }}
+                >
+                  💭 Q. {currentFaq.question}
                 </p>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
                   {currentFaq.answer}
                 </p>
               </div>
             </div>
 
-            {/* アクションボタン */}
-            <div className="space-y-2">
-              <p className="text-center text-purple-300/80 text-xs">この回答で解決しましたか？</p>
-              <div className="flex gap-2">
+            {/* アクションボタン - 改良版 */}
+            <div className="space-y-3 pt-2">
+              <p className="text-center text-xs" style={{ color: "rgba(232, 180, 200, 0.7)" }}>
+                ✨ この回答で解決しましたか？
+              </p>
+              <div className="flex gap-3">
                 <button
                   onClick={faqResolved}
-                  className="flex-1 py-3 bg-green-500/30 hover:bg-green-500/50 border border-green-400/50 rounded-xl text-green-300 font-medium transition-colors"
+                  className="flex-1 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(22, 163, 74, 0.2) 100%)",
+                    border: "2px solid rgba(34, 197, 94, 0.5)",
+                    color: "#4ade80",
+                    boxShadow: "0 0 15px rgba(34, 197, 94, 0.15)"
+                  }}
                 >
-                  解決した
+                  ✅ 解決した
                 </button>
                 <button
                   onClick={showNextFaq}
-                  className="flex-1 py-3 bg-orange-500/30 hover:bg-orange-500/50 border border-orange-400/50 rounded-xl text-orange-300 font-medium transition-colors"
+                  className="flex-1 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(251, 146, 60, 0.25) 0%, rgba(234, 88, 12, 0.2) 100%)",
+                    border: "2px solid rgba(251, 146, 60, 0.5)",
+                    color: "#fb923c",
+                    boxShadow: "0 0 15px rgba(251, 146, 60, 0.15)"
+                  }}
                 >
-                  {currentFaqIndex < selectedCategory.faqs.length - 1 ? "他の回答を見る" : "問い合わせる"}
+                  {currentFaqIndex < selectedCategory.faqs.length - 1 ? "🔄 他の回答を見る" : "📝 問い合わせる"}
                 </button>
               </div>
               <button
                 onClick={backToCategories}
-                className="w-full py-2 text-purple-400/60 text-xs hover:text-purple-300 transition-colors"
+                className="w-full py-2 text-xs transition-all duration-200 hover:translate-x-[-4px]"
+                style={{ color: "rgba(192, 132, 252, 0.6)" }}
               >
                 ← カテゴリ選択に戻る
               </button>
@@ -500,31 +581,44 @@ export default function RASChatBot() {
       case "faq_resolved":
         return (
           <div className="space-y-4 text-center">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50 mx-auto">
-                <Image src={RAS_IMAGES.happy} alt="RASくん" width={40} height={40} className="object-cover" />
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full overflow-hidden shadow-xl" style={{ boxShadow: "0 0 25px rgba(34, 197, 94, 0.5), 0 0 50px rgba(255, 165, 0, 0.3)" }}>
+                <div className="w-full h-full border-3 border-green-400/60 rounded-full overflow-hidden bg-gradient-to-br from-green-200 to-emerald-200 p-0.5">
+                  <Image src={RAS_IMAGES.happy} alt="RASくん" width={60} height={60} className="object-cover rounded-full" />
+                </div>
               </div>
             </div>
-            <div className="bg-white/95 rounded-2xl p-4 text-gray-800 shadow-lg">
-              <p className="text-4xl mb-2">🎉</p>
-              <p className="text-sm font-bold mb-2">よかったです！</p>
-              <p className="text-xs text-gray-600">
+            <div
+              className="rounded-2xl p-5 shadow-xl"
+              style={{
+                background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(240, 253, 244, 0.98) 100%)",
+                boxShadow: "0 4px 20px rgba(34, 197, 94, 0.15), 0 0 40px rgba(255, 200, 220, 0.1)"
+              }}
+            >
+              <p className="text-5xl mb-3">🎉</p>
+              <p className="text-base font-bold mb-2 text-green-600">よかったです！</p>
+              <p className="text-sm text-gray-600">
                 他にお困りのことがあれば、
                 <br />
-                いつでもお声がけくださいね。
+                いつでもお声がけくださいね ✨
               </p>
             </div>
             <button
               onClick={backToCategories}
-              className="w-full py-3 bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-opacity"
+              className="w-full py-3.5 text-white rounded-xl font-bold shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)",
+                boxShadow: "0 4px 15px rgba(201, 75, 124, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+              }}
             >
-              他の質問をする
+              🔍 他の質問をする
             </button>
             <button
               onClick={toggleChat}
-              className="w-full py-2 text-purple-400/60 text-sm hover:text-purple-300 transition-colors"
+              className="w-full py-2 text-sm transition-all duration-200"
+              style={{ color: "rgba(192, 132, 252, 0.6)" }}
             >
-              閉じる
+              閉じる ×
             </button>
           </div>
         );
@@ -726,48 +820,78 @@ export default function RASChatBot() {
       {/* フローティングボタン */}
       <button
         onClick={toggleChat}
-        className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full overflow-hidden ras-float ras-pulse-glow cursor-pointer transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-orange-400/50"
+        className="fixed bottom-6 right-6 z-50 w-18 h-18 rounded-full overflow-hidden ras-float ras-pulse-glow cursor-pointer transition-all duration-300 hover:scale-110 focus:outline-none"
         aria-label="オペレーターRASくんとチャット"
+        style={{
+          width: "72px",
+          height: "72px",
+          boxShadow: "0 0 25px rgba(255, 140, 0, 0.6), 0 0 50px rgba(255, 105, 180, 0.3), 0 8px 30px rgba(0, 0, 0, 0.4)"
+        }}
       >
-        <div className="relative w-full h-full bg-gradient-to-br from-orange-400 via-orange-500 to-pink-500 flex items-center justify-center">
-          <Image
-            src={RAS_IMAGES.greeting}
-            alt="RASくん"
-            width={56}
-            height={56}
-            className="object-cover rounded-full"
-            priority
-          />
+        <div className="relative w-full h-full bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 flex items-center justify-center p-1">
+          <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40">
+            <Image
+              src={RAS_IMAGES.greeting}
+              alt="RASくん"
+              width={64}
+              height={64}
+              className="object-cover w-full h-full"
+              priority
+            />
+          </div>
           {showSparkles && (
             <>
-              <span className="absolute top-0 right-0 w-2 h-2 bg-yellow-300 rounded-full animate-ping" />
-              <span className="absolute bottom-2 left-0 w-1.5 h-1.5 bg-pink-300 rounded-full animate-ping delay-150" />
-              <span className="absolute top-2 left-2 w-1 h-1 bg-white rounded-full animate-ping delay-300" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-300 rounded-full animate-ping" style={{ animationDuration: "0.8s" }} />
+              <span className="absolute bottom-0 -left-1 w-2.5 h-2.5 bg-pink-300 rounded-full animate-ping" style={{ animationDuration: "1s", animationDelay: "0.2s" }} />
+              <span className="absolute top-1 left-0 w-2 h-2 bg-white rounded-full animate-ping" style={{ animationDuration: "1.2s", animationDelay: "0.4s" }} />
             </>
           )}
+        </div>
+        {/* ヘルプテキスト */}
+        <div className="absolute -top-2 -left-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg animate-pulse">
+          💬 質問
         </div>
       </button>
 
       {/* チャットウィンドウ */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[360px] max-w-[calc(100vw-48px)] h-[550px] max-h-[calc(100vh-150px)] flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-orange-400/30">
-          {/* ヘッダー */}
+        <div
+          className="fixed bottom-24 right-4 sm:right-6 z-50 w-[340px] sm:w-[380px] max-w-[calc(100vw-32px)] h-[520px] sm:h-[580px] max-h-[calc(100vh-150px)] flex flex-col rounded-3xl overflow-hidden"
+          style={{
+            boxShadow: "0 0 60px rgba(201, 75, 124, 0.4), 0 0 100px rgba(155, 75, 138, 0.2), 0 25px 50px rgba(0, 0, 0, 0.5)",
+            border: "2px solid rgba(212, 165, 116, 0.4)"
+          }}
+        >
+          {/* ヘッダー - よりリッチなデザイン */}
           <div
-            className="relative flex items-center gap-3 p-4 text-white"
+            className="relative flex items-center gap-3 p-4 text-white overflow-hidden"
             style={{
-              background: "linear-gradient(135deg, #ff8c00 0%, #ff6347 50%, #ff69b4 100%)",
+              background: "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 50%, #7a4b9b 100%)",
             }}
           >
-            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white/50 bg-white/20 flex-shrink-0">
-              <Image src={RAS_IMAGES[emotion]} alt="RASくん" width={48} height={48} className="object-cover" />
+            {/* 背景の装飾 */}
+            <div className="absolute inset-0 opacity-30">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2" />
+              <div className="absolute bottom-0 right-0 w-24 h-24 bg-pink-300/10 rounded-full translate-x-1/2 translate-y-1/2" />
+            </div>
+
+            <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ras-pulse-glow" style={{ boxShadow: "0 0 15px rgba(255, 165, 0, 0.6)" }}>
+              <div className="w-full h-full border-2 border-white/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-300 to-pink-400 p-0.5">
+                <Image src={RAS_IMAGES[emotion]} alt="RASくん" width={52} height={52} className="object-cover rounded-full" />
+              </div>
             </div>
             <div className="relative flex-1">
-              <h3 className="font-bold text-lg drop-shadow-md">オペレーターRASくん</h3>
-              <p className="text-xs opacity-90">夢タイプ診断のサポーター</p>
+              <h3 className="font-bold text-lg drop-shadow-lg" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
+                ✨ オペレーターRASくん
+              </h3>
+              <p className="text-xs text-white/80 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                夢タイプ診断のサポーター
+              </p>
             </div>
             <button
               onClick={toggleChat}
-              className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              className="relative w-9 h-9 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition-all duration-200 hover:rotate-90"
               aria-label="チャットを閉じる"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -776,23 +900,44 @@ export default function RASChatBot() {
             </button>
           </div>
 
-          {/* コンテンツエリア */}
+          {/* コンテンツエリア - 背景グラデーション強化 */}
           <div
-            className="flex-1 overflow-y-auto p-4"
+            className="flex-1 overflow-y-auto p-4 relative"
             style={{
-              background: "linear-gradient(180deg, #2d1028 0%, #1a0a1a 100%)",
+              background: "linear-gradient(180deg, #2d1028 0%, #1f0d1f 50%, #150a15 100%)",
             }}
           >
-            {renderContent()}
+            {/* 背景のキラキラ効果 */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute top-10 left-5 w-1 h-1 bg-pink-400/40 rounded-full animate-pulse" />
+              <div className="absolute top-20 right-10 w-1.5 h-1.5 bg-orange-300/30 rounded-full animate-pulse" style={{ animationDelay: "0.5s" }} />
+              <div className="absolute top-40 left-10 w-1 h-1 bg-purple-400/40 rounded-full animate-pulse" style={{ animationDelay: "1s" }} />
+              <div className="absolute bottom-20 right-5 w-1 h-1 bg-pink-300/30 rounded-full animate-pulse" style={{ animationDelay: "1.5s" }} />
+            </div>
+
+            <div className="relative z-10">
+              {renderContent()}
+            </div>
             <div ref={messagesEndRef} />
           </div>
 
-          {/* フッター（フリーチャット切替） */}
+          {/* フッター（フリーチャット切替） - より目立つデザイン */}
           {step !== "free_chat" && step !== "inquiry_sent" && step !== "faq_resolved" && (
-            <div className="p-2 bg-gradient-to-r from-[#2d1028] to-[#1a0a1a] border-t border-orange-400/20">
+            <div
+              className="p-3 border-t"
+              style={{
+                background: "linear-gradient(180deg, #1f0d1f 0%, #150a15 100%)",
+                borderColor: "rgba(201, 75, 124, 0.3)"
+              }}
+            >
               <button
                 onClick={enableFreeChat}
-                className="w-full py-2 text-xs text-purple-400/50 hover:text-purple-300 transition-colors"
+                className="w-full py-2.5 text-xs rounded-xl transition-all duration-300 hover:scale-[1.02]"
+                style={{
+                  background: "linear-gradient(135deg, rgba(201, 75, 124, 0.15) 0%, rgba(155, 75, 138, 0.1) 100%)",
+                  border: "1px solid rgba(201, 75, 124, 0.3)",
+                  color: "rgba(232, 180, 200, 0.8)"
+                }}
               >
                 💬 自由にチャットで質問する（AI回答）
               </button>

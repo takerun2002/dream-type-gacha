@@ -271,6 +271,7 @@ export default function ResultPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   // エラー状態の管理
   const [cardError, setCardError] = useState<string | null>(null);
+  const [cardImageLoadError, setCardImageLoadError] = useState(false); // 画像読み込みエラー
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   // キュー状態の管理
@@ -754,13 +755,44 @@ export default function ResultPage() {
                   fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:image-error',message:'画像読み込みエラー',data:{cardImageUrlPrefix:cardImageUrl?.substring(0,100)||'null',cardImageUrlLength:cardImageUrl?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5-image-load'})}).catch(()=>{});
                   // #endregion
                   console.error('画像読み込みエラー:', cardImageUrl?.substring(0, 100));
+                  // 画像読み込みエラーを設定して再生成UIを表示
+                  setCardImageLoadError(true);
                 }}
                 onLoad={() => {
                   // #region agent log
                   fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:image-loaded',message:'画像読み込み成功',data:{cardImageUrlPrefix:cardImageUrl?.substring(0,100)||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5-image-load'})}).catch(()=>{});
                   // #endregion
+                  setCardImageLoadError(false);
                 }}
               />
+            ) : cardImageLoadError ? (
+              // 画像読み込みエラー時（期限切れURL等）
+              <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-yellow-900/30 rounded-2xl p-6 border border-yellow-500/50">
+                <div className="text-5xl mb-4">⚠️</div>
+                <h3 className="text-xl font-bold text-yellow-300 mb-2">カード画像の再生成が必要です</h3>
+                <p className="text-yellow-200 text-sm text-center mb-4">
+                  保存されていた画像データが古くなりました。<br/>
+                  「再生成」ボタンを押してカードを作り直してください。
+                </p>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    // 古いデータをクリアして再生成
+                    localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
+                    setCardImageUrl(null);
+                    setCardGenerated(false);
+                    setCardImageLoadError(false);
+                    generateCard();
+                  }}
+                  className="btn-primary w-full max-w-xs"
+                >
+                  🔄 カードを再生成する
+                </motion.button>
+                <p className="text-purple-400 text-xs mt-4 text-center">
+                  ※ 今回から画像は永続的に保存されます
+                </p>
+              </div>
             ) : cardError ? (
               // エラー表示
               <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-red-900/30 rounded-2xl p-6 border border-red-500/50">
