@@ -303,13 +303,29 @@ export default function ResultPage() {
       // #endregion
       
       if (savedCardImage) {
-        setCardImageUrl(savedCardImage);
-        setCardGenerated(true);
-        console.log("📸 保存済みカード画像を復元しました");
-        
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-success',message:'カード画像復元成功',data:{urlType:savedCardImage.startsWith('data:')? 'base64':'url',urlStart:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3-urltype'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-check-type',message:'保存データタイプ確認',data:{isBase64:savedCardImage.startsWith('data:'),isBlob:savedCardImage.startsWith('blob:'),urlStart:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
         // #endregion
+        
+        // Base64形式（data:image/...）のみ有効、Blob URLは無効
+        if (savedCardImage.startsWith('data:')) {
+          setCardImageUrl(savedCardImage);
+          setCardGenerated(true);
+          console.log("📸 保存済みBase64カード画像を復元しました");
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-success',message:'Base64カード画像復元成功',data:{base64Length:savedCardImage.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
+          // #endregion
+        } else {
+          // 古いBlob URLは無効なのでクリア
+          console.log("⚠️ 古いBlob URLを検出、クリアして再生成を促します");
+          localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
+          setCardImageLoadError(true); // 再生成UIを表示
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-blob-cleared',message:'古いBlob URLをクリア',data:{clearedUrl:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
+          // #endregion
+        }
       } else {
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-empty',message:'保存済み画像なし',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H2-storage'})}).catch(()=>{});
