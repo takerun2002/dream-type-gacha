@@ -293,7 +293,6 @@ export default function ResultPage() {
       
       setCanShare(isShareSupported());
       const rid = new URLSearchParams(window.location.search).get("rid");
-      console.log("🔍 [DEBUG v15] カード画像復元処理開始（rid優先→localStorage→Supabase）", { rid: rid ? `${rid.slice(0, 8)}...` : null });
 
       // Step 0: URLのridがあれば最優先で復元（別ブラウザ/シークレットでも復元可能）
       if (rid) {
@@ -303,59 +302,49 @@ export default function ResultPage() {
             setCardImageUrl(url);
             setCardGenerated(true);
             localStorage.setItem(CARD_IMAGE_STORAGE_KEY, url);
-            console.log("✅ [rid] Supabaseからカード画像URLを復元:", url.substring(0, 80));
             return;
           }
-          console.log("⚠️ [rid] card_image_url が見つかりませんでした");
-        } catch (e) {
-          console.error("❌ [rid] 復元失敗:", e);
+        } catch {
+          // 復元失敗時は次のステップへ
         }
       }
 
       // Step 1: localStorageから復元を試みる
       const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
-      console.log("🔍 [DEBUG v15] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
-      
+
       // Base64形式（data:image/...）は有効
       if (savedCardImage && savedCardImage.startsWith('data:')) {
         setCardImageUrl(savedCardImage);
         setCardGenerated(true);
-        console.log("✅ localStorageからBase64画像を復元");
         return;
       }
-      
+
       // 永続的なURL（https://...supabase.co/...）も有効
       if (savedCardImage && savedCardImage.startsWith('https://')) {
         setCardImageUrl(savedCardImage);
         setCardGenerated(true);
-        console.log("✅ localStorageからSupabase URLを復元");
         return;
       }
-      
+
       // 古いBlob URLはクリア
       if (savedCardImage && savedCardImage.startsWith('blob:')) {
-        console.log("⚠️ 古いBlob URLを検出、クリアします");
         localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
       }
-      
+
       // Step 2: Supabaseから復元を試みる（フォールバック）
-      console.log("🔍 [DEBUG v15] Supabaseからカード画像URL取得を試みます（fingerprint → userName+dreamType）");
       try {
         const supabaseImageUrl = await getSavedCardImageUrl();
         if (supabaseImageUrl) {
           setCardImageUrl(supabaseImageUrl);
           setCardGenerated(true);
-          // 取得したURLをlocalStorageにも保存（次回用）
           localStorage.setItem(CARD_IMAGE_STORAGE_KEY, supabaseImageUrl);
-          console.log("✅ Supabaseからカード画像URLを復元:", supabaseImageUrl.substring(0, 60));
           return;
         }
-      } catch (error) {
-        console.error("Supabaseからの復元に失敗:", error);
+      } catch {
+        // Supabase復元失敗時は再生成を待つ
       }
-      
+
       // Step 3: どちらも失敗した場合は再生成を待つ（cardGenerated=falseのまま）
-      console.log("🔍 [DEBUG v15] 保存済み画像なし、再生成を待機");
     };
     
     restoreCardImage();
