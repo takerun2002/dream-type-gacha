@@ -96,13 +96,15 @@ export default function GachaPage() {
       setPhase("complete");
       
       setTimeout(() => {
-        router.push("/result");
+        const rid = sessionStorage.getItem("diagnosisRecordId");
+        router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
       }, 2500);
     }, 3500);
   }, [phase, router]);
 
   const handleSkip = () => {
-    router.push("/result");
+    const rid = sessionStorage.getItem("diagnosisRecordId");
+    router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
   };
 
   const typeData = dreamType ? dreamTypes[dreamType] : null;

@@ -124,7 +124,8 @@ export default function Home() {
       setPasswordError(false);
       // 診断済みの場合はリザルトへ、そうでなければウェルカムへ
       if (isAlreadyDiagnosed) {
-        router.push("/result");
+        const rid = localStorage.getItem("dream_diagnosis_record_id");
+        router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
       } else {
         setStep("welcome");
       }
@@ -237,7 +238,11 @@ export default function Home() {
           sessionStorage.setItem("answers", JSON.stringify(newAnswers));
           
           // おひとり様1回制限: 診断完了を記録（DB + ローカル）
-          await recordDiagnosis(data.result.dreamType, userName);
+          const rec = await recordDiagnosis(data.result.dreamType, userName);
+          if (rec?.recordId) {
+            sessionStorage.setItem("diagnosisRecordId", rec.recordId);
+            localStorage.setItem("dream_diagnosis_record_id", rec.recordId);
+          }
           
           setTimeout(() => {
             router.push("/gacha");

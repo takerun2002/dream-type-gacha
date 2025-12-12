@@ -7,7 +7,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { dreamTypes } from "@/lib/dreamTypes";
 import { generateCardWithGemini, downloadCardGemini, isShareSupported, type CardDataGemini } from "@/lib/cardGeneratorGemini";
-import { getSavedDiagnosisData, getSavedCardImageUrl } from "@/lib/diagnosisRecord";
+import { getCardImageUrlByRecordId, getSavedDiagnosisData, getSavedCardImageUrl } from "@/lib/diagnosisRecord";
 import Confetti from "@/components/Confetti";
 
 // Three.js背景を動的インポート（SSR無効）
@@ -292,11 +292,29 @@ export default function ResultPage() {
       if (typeof window === "undefined") return;
       
       setCanShare(isShareSupported());
-      console.log("🔍 [DEBUG v14] カード画像復元処理開始（ユーザー名+夢タイプ検索対応）");
+      const rid = new URLSearchParams(window.location.search).get("rid");
+      console.log("🔍 [DEBUG v15] カード画像復元処理開始（rid優先→localStorage→Supabase）", { rid: rid ? `${rid.slice(0, 8)}...` : null });
+
+      // Step 0: URLのridがあれば最優先で復元（別ブラウザ/シークレットでも復元可能）
+      if (rid) {
+        try {
+          const url = await getCardImageUrlByRecordId(rid);
+          if (url) {
+            setCardImageUrl(url);
+            setCardGenerated(true);
+            localStorage.setItem(CARD_IMAGE_STORAGE_KEY, url);
+            console.log("✅ [rid] Supabaseからカード画像URLを復元:", url.substring(0, 80));
+            return;
+          }
+          console.log("⚠️ [rid] card_image_url が見つかりませんでした");
+        } catch (e) {
+          console.error("❌ [rid] 復元失敗:", e);
+        }
+      }
 
       // Step 1: localStorageから復元を試みる
       const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
-      console.log("🔍 [DEBUG v14] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
+      console.log("🔍 [DEBUG v15] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
       
       // Base64形式（data:image/...）は有効
       if (savedCardImage && savedCardImage.startsWith('data:')) {
@@ -321,7 +339,7 @@ export default function ResultPage() {
       }
       
       // Step 2: Supabaseから復元を試みる（フォールバック）
-      console.log("🔍 [DEBUG v14] Supabaseからカード画像URL取得を試みます（fingerprint → userName+dreamType）");
+      console.log("🔍 [DEBUG v15] Supabaseからカード画像URL取得を試みます（fingerprint → userName+dreamType）");
       try {
         const supabaseImageUrl = await getSavedCardImageUrl();
         if (supabaseImageUrl) {
@@ -337,7 +355,7 @@ export default function ResultPage() {
       }
       
       // Step 3: どちらも失敗した場合は再生成を待つ（cardGenerated=falseのまま）
-      console.log("🔍 [DEBUG v14] 保存済み画像なし、再生成を待機");
+      console.log("🔍 [DEBUG v15] 保存済み画像なし、再生成を待機");
     };
     
     restoreCardImage();

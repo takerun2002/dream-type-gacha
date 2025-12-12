@@ -134,24 +134,31 @@ export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
 export async function recordDiagnosis(
   dreamType: string,
   userName: string
-): Promise<boolean> {
+): Promise<{ success: boolean; recordId?: string }> {
   const fingerprint = await getFingerprint();
   const ipAddress = await getClientIP();
   const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  let recordId: string | undefined;
 
   // 1. Supabaseに保存（設定されている場合）
   if (isSupabaseConfigured() && supabase) {
     try {
-      const { error } = await supabase.from("diagnosis_records").insert({
-        fingerprint,
-        ip_address: ipAddress,
-        dream_type: dreamType,
-        user_name: userName,
-        user_agent: userAgent,
-      });
+      const { data, error } = await supabase
+        .from("diagnosis_records")
+        .insert({
+          fingerprint,
+          ip_address: ipAddress,
+          dream_type: dreamType,
+          user_name: userName,
+          user_agent: userAgent,
+        })
+        .select("id")
+        .single();
 
       if (error) {
         console.error("Supabase insert error:", error);
+      } else if (data?.id) {
+        recordId = data.id as string;
       }
     } catch (error) {
       console.error("Supabase error:", error);
@@ -170,7 +177,32 @@ export async function recordDiagnosis(
     localStorage.setItem(FINGERPRINT_KEY, fingerprint);
   }
 
-  return true;
+  return { success: true, recordId };
+}
+
+/**
+ * Supabaseから診断レコードIDでカード画像URLを取得
+ * - フィンガープリントやlocalStorageに依存しない復元用（/result?rid=...）
+ */
+export async function getCardImageUrlByRecordId(recordId: string): Promise<string | null> {
+  if (!recordId) return null;
+  if (!isSupabaseConfigured() || !supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("diagnosis_records")
+      .select("card_image_url")
+      .eq("id", recordId)
+      .single();
+    if (error) {
+      console.error("Supabase recordId検索エラー:", error);
+      return null;
+    }
+    const url = (data as any)?.card_image_url as string | null | undefined;
+    return url || null;
+  } catch (e) {
+    console.error("getCardImageUrlByRecordId error:", e);
+    return null;
+  }
 }
 
 /**
