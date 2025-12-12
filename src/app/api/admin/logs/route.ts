@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // 管理者パスワード
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "kinmanadmin2025";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
 // Supabaseクライアント
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

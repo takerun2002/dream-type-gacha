@@ -27,7 +27,7 @@ interface Answer {
 }
 
 // 🔐 合言葉（パスワード）設定
-const SECRET_PASSWORD = process.env.NEXT_PUBLIC_ACCESS_PASSWORD || "kinman2025";
+const SECRET_PASSWORD = process.env.NEXT_PUBLIC_ACCESS_PASSWORD || "";
 
 // リッチなオーラエフェクトコンポーネント
 function MysticalAura() {

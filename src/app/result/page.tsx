@@ -540,21 +540,9 @@ export default function ResultPage() {
       
       // カード画像をローカルストレージに保存（再アクセス時に復元用）
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:save',message:'カード画像保存開始',data:{imageUrlLength:imageUrl.length,imageUrlType:imageUrl.startsWith('data:')? 'base64':'url',imageUrlPrefix:imageUrl.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-save'})}).catch(()=>{});
-        // #endregion
-        
         localStorage.setItem(CARD_IMAGE_STORAGE_KEY, imageUrl);
-        console.log("💾 カード画像をローカルストレージに保存しました");
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:save-success',message:'カード画像保存成功',data:{storageKey:CARD_IMAGE_STORAGE_KEY},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-save'})}).catch(()=>{});
-        // #endregion
-      } catch (storageError) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:save-error',message:'カード画像保存失敗',data:{error:String(storageError)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4-save'})}).catch(()=>{});
-        // #endregion
-        console.warn("カード画像の保存に失敗:", storageError);
+      } catch {
+        // ストレージ容量超過時は無視
       }
       
       // キューから離脱（完了）
@@ -782,18 +770,10 @@ export default function ResultPage() {
                   boxShadow: `0 0 60px ${typeData.color}40`,
                 }}
                 unoptimized
-                onError={(e) => {
-                  // #region agent log
-                  fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:image-error',message:'画像読み込みエラー',data:{cardImageUrlPrefix:cardImageUrl?.substring(0,100)||'null',cardImageUrlLength:cardImageUrl?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5-image-load'})}).catch(()=>{});
-                  // #endregion
-                  console.error('画像読み込みエラー:', cardImageUrl?.substring(0, 100));
-                  // 画像読み込みエラーを設定して再生成UIを表示
+                onError={() => {
                   setCardImageLoadError(true);
                 }}
                 onLoad={() => {
-                  // #region agent log
-                  fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:image-loaded',message:'画像読み込み成功',data:{cardImageUrlPrefix:cardImageUrl?.substring(0,100)||'null'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5-image-load'})}).catch(()=>{});
-                  // #endregion
                   setCardImageLoadError(false);
                 }}
               />

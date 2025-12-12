@@ -98,11 +98,7 @@ export async function generateCardWithGemini(
   // PNGをBlobとして取得してBase64に変換（永続化可能）
   const blob = await response.blob();
   const base64 = await blobToBase64(blob);
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'cardGeneratorGemini.ts:generateCard',message:'Base64変換完了',data:{base64Length:base64.length,base64Prefix:base64.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H-fix'})}).catch(()=>{});
-  // #endregion
-  
+
   return base64; // data:image/png;base64,... 形式
 }
 
@@ -133,8 +129,7 @@ export async function downloadCardGemini(
         if ((error as Error).name === "AbortError") {
           return { method: "share", success: false };
         }
-        // 共有失敗時はフォールバック
-        console.log("Share failed, falling back to download");
+        // 共有失敗時はダウンロードにフォールバック
       }
     }
   }

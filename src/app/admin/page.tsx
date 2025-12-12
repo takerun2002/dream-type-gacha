@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 
 // 管理者パスワード（環境変数で設定可能）
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin2025";
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "";
 
 // タイプ名のマッピング
 const TYPE_NAMES: Record<string, string> = {
