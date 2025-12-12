@@ -1,108 +1,111 @@
-# Claude Code 指示書: カード画像永続化問題の修正
+# Claude Code 指示書: カード画像永続化問題の最終確認と修正
 
 ## 📋 問題概要
 
 ユーザーがページを離れて戻ってくると、生成されたカード画像が表示されなくなる。
 「生成されたカード」というaltテキストだけが表示され、画像は表示されない。
 
-## 🔍 根本原因
+## 🔍 調査済みの内容
 
-1. `generateCardWithGemini` 関数が `URL.createObjectURL(blob)` でBlob URLを返していた
-2. Blob URL (`blob:https://...`) はブラウザのメモリに一時的に存在する
-3. ページをリロードするとBlob URLは無効になる
-4. localStorageにはURL文字列だけが保存され、実際のBlobデータは保存されない
+### Supabaseのデータ確認済み
+```json
+{
+  "user_name": "岡島武尊",
+  "dream_type": "phoenix",
+  "card_image_url": "https://lfpvgjnlxtkjygbexiph.supabase.co/storage/v1/object/public/card-images/1765523348624-phoenix.png",
+  "fingerprint": "cf1a9226fb6f0670cdd3faa5d3560353"
+}
+```
+- 画像URLは有効（HTTP 200、841KB PNG）
 
-## ✅ 必要な修正
+### 実装済みの修正
 
-### 1. `src/lib/cardGeneratorGemini.ts` の修正
+1. **`src/lib/cardGeneratorGemini.ts`**
+   - BlobをBase64に変換して返すように修正済み
+
+2. **`src/lib/diagnosisRecord.ts`**
+   - `getSavedCardImageUrl()` 関数を追加
+   - Supabaseから保存済みカード画像URLを取得するフォールバック機能
+
+3. **`src/app/result/page.tsx`**
+   - 復元ロジックを修正：
+     1. localStorageからBase64形式を復元
+     2. localStorageからSupabase URLを復元
+     3. 古いBlob URLはクリア
+     4. Supabaseから画像URLを取得（フォールバック）
+
+## ⚠️ 確認が必要なこと
+
+1. **デプロイが反映されているか確認**
+   - ブラウザのコンソール（F12 → Console）で `🔍 [DEBUG v13]` が表示されるか
+   - 表示されない場合は古いバージョンがキャッシュされている
+
+2. **Supabaseフォールバックが動作しているか確認**
+   - コンソールに `✅ Supabaseからカード画像URLを復元:` が表示されるか
+
+3. **フィンガープリントが一致しているか確認**
+   - Supabaseのレコードは `fingerprint: cf1a9226fb6f0670cdd3faa5d3560353`
+   - ブラウザで生成されるフィンガープリントがこれと一致しないと復元できない
+
+## 🔧 追加で必要かもしれない修正
+
+### 案1: フィンガープリントに依存しない復元
+
+現在の実装はフィンガープリントで一致するレコードを検索している。
+シークレットウィンドウや別のブラウザでは異なるフィンガープリントが生成されるため、復元できない。
+
+**修正案**: sessionStorageに保存された診断IDを使ってSupabaseからレコードを取得する
 
 ```typescript
-/**
- * BlobをBase64文字列に変換
- */
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      resolve(result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
-export async function generateCardWithGemini(
-  data: CardDataGemini
-): Promise<string> {
-  const response = await fetch("/api/generate-card-gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "カード生成に失敗しました");
+// result/page.tsxで
+const diagnosisId = sessionStorage.getItem("diagnosisId");
+if (diagnosisId) {
+  const { data } = await supabase
+    .from("diagnosis_records")
+    .select("card_image_url")
+    .eq("id", diagnosisId)
+    .single();
+  
+  if (data?.card_image_url) {
+    setCardImageUrl(data.card_image_url);
+    setCardGenerated(true);
   }
-
-  // ★重要: BlobをBase64に変換して返す（永続化可能）
-  const blob = await response.blob();
-  const base64 = await blobToBase64(blob);
-  
-  console.log("✅ カード画像をBase64形式で生成:", base64.substring(0, 50) + "...");
-  
-  return base64; // data:image/png;base64,... 形式
 }
 ```
 
-### 2. `src/app/result/page.tsx` の修正
+### 案2: ユーザー名とdreamTypeで検索
 
 ```typescript
-// マウント時の画像復元ロジック
-useEffect(() => {
-  if (typeof window !== "undefined") {
-    const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
-    
-    console.log("🔍 保存済み画像チェック:", savedCardImage ? savedCardImage.substring(0, 50) : "なし");
-    
-    if (savedCardImage) {
-      // Base64形式（data:image/...）のみ有効
-      if (savedCardImage.startsWith('data:')) {
-        setCardImageUrl(savedCardImage);
-        setCardGenerated(true);
-        console.log("✅ Base64画像を復元");
-      } else {
-        // 古いBlob URLは無効なのでクリア
-        console.log("⚠️ 古いBlob URLを検出、クリアします");
-        localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
-        setCardImageUrl(null);
-        setCardGenerated(false);
-        // 自動で再生成が開始される
-      }
-    }
-  }
-}, []);
+const savedData = getSavedDiagnosisData();
+if (savedData?.userName && savedData?.dreamType) {
+  const { data } = await supabase
+    .from("diagnosis_records")
+    .select("card_image_url")
+    .eq("user_name", savedData.userName)
+    .eq("dream_type", savedData.dreamType)
+    .order("created_at", { ascending: false })
+    .limit(1);
+}
 ```
 
 ## 🧪 テスト手順
 
-1. シークレットウィンドウで https://dream-type-gacha.vercel.app にアクセス
-2. 診断を最初から実行してカードを生成
-3. ブラウザのコンソールで `✅ カード画像をBase64形式で生成` を確認
-4. ブラウザタブを閉じる
-5. 新しいタブで https://dream-type-gacha.vercel.app/result にアクセス
-6. カード画像が正しく表示されることを確認
+1. ブラウザでF12を開いてConsoleタブを確認
+2. https://dream-type-gacha.vercel.app/result にアクセス
+3. Cmd+Shift+R でキャッシュ無視リロード
+4. コンソールに以下が表示されるか確認：
+   - `🔍 [DEBUG v13] カード画像復元処理開始`
+   - `✅ Supabaseからカード画像URLを復元:` または `✅ localStorageから...`
+5. カード画像が表示されるか確認
 
 ## ✅ 完了条件
 
-- カード生成時にBase64形式で保存される
-- ページを離れて戻っても画像が表示される
-- 古いBlob URLは自動的にクリアされて再生成される
+- ページを離れて戻っても、カード画像が正しく表示される
+- シークレットウィンドウでも同様に動作する
+- コンソールにエラーが表示されない
 
-## 📝 備考
+## 📝 環境情報
 
-- Base64形式は `data:image/png;base64,...` で始まる
-- Blob URL形式は `blob:https://...` で始まる
-- localStorageにはBase64形式のみ保存する
-
+- プロジェクト: `/Users/okajima/引き寄せノート講座ローンチプロジェクト/dream-type-gacha`
+- Supabase URL: `https://lfpvgjnlxtkjygbexiph.supabase.co`
+- Vercel URL: `https://dream-type-gacha.vercel.app`

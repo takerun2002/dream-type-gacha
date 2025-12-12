@@ -292,11 +292,11 @@ export default function ResultPage() {
       if (typeof window === "undefined") return;
       
       setCanShare(isShareSupported());
-      console.log("🔍 [DEBUG v13] カード画像復元処理開始");
-      
+      console.log("🔍 [DEBUG v14] カード画像復元処理開始（ユーザー名+夢タイプ検索対応）");
+
       // Step 1: localStorageから復元を試みる
       const savedCardImage = localStorage.getItem(CARD_IMAGE_STORAGE_KEY);
-      console.log("🔍 [DEBUG v13] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
+      console.log("🔍 [DEBUG v14] localStorage:", savedCardImage ? `${savedCardImage.substring(0, 50)}...` : "null");
       
       // Base64形式（data:image/...）は有効
       if (savedCardImage && savedCardImage.startsWith('data:')) {
@@ -321,7 +321,7 @@ export default function ResultPage() {
       }
       
       // Step 2: Supabaseから復元を試みる（フォールバック）
-      console.log("🔍 [DEBUG v13] Supabaseからカード画像URL取得を試みます");
+      console.log("🔍 [DEBUG v14] Supabaseからカード画像URL取得を試みます（fingerprint → userName+dreamType）");
       try {
         const supabaseImageUrl = await getSavedCardImageUrl();
         if (supabaseImageUrl) {
@@ -337,7 +337,7 @@ export default function ResultPage() {
       }
       
       // Step 3: どちらも失敗した場合は再生成を待つ（cardGenerated=falseのまま）
-      console.log("🔍 [DEBUG v13] 保存済み画像なし、再生成を待機");
+      console.log("🔍 [DEBUG v14] 保存済み画像なし、再生成を待機");
     };
     
     restoreCardImage();

@@ -210,33 +210,63 @@ export function resetDiagnosisRecord(): void {
 /**
  * Supabaseから保存済みのカード画像URLを取得
  * localStorageの復元が失敗した場合のフォールバック用
+ *
+ * 検索順序:
+ * 1. フィンガープリントで検索（同一デバイス・ブラウザの場合）
+ * 2. ユーザー名＋夢タイプで検索（フォールバック）
  */
 export async function getSavedCardImageUrl(): Promise<string | null> {
-  const fingerprint = await getFingerprint();
-  
   if (!isSupabaseConfigured() || !supabase) {
     console.log("⚠️ Supabaseが設定されていません");
     return null;
   }
-  
+
   try {
-    const { data, error } = await supabase
+    // Step 1: フィンガープリントで検索
+    const fingerprint = await getFingerprint();
+    console.log("🔍 [DEBUG] フィンガープリントで検索:", fingerprint.substring(0, 20) + "...");
+
+    const { data: fpData, error: fpError } = await supabase
       .from("diagnosis_records")
       .select("card_image_url")
       .eq("fingerprint", fingerprint)
       .order("created_at", { ascending: false })
       .limit(1);
-    
-    if (error) {
-      console.error("Supabase card image fetch error:", error);
-      return null;
+
+    if (fpError) {
+      console.error("Supabase fingerprint検索エラー:", fpError);
+    } else if (fpData && fpData.length > 0 && fpData[0].card_image_url) {
+      console.log("✅ [フィンガープリント] カード画像URLを取得:", fpData[0].card_image_url.substring(0, 80));
+      return fpData[0].card_image_url;
     }
-    
-    if (data && data.length > 0 && data[0].card_image_url) {
-      console.log("✅ Supabaseからカード画像URLを取得:", data[0].card_image_url.substring(0, 80));
-      return data[0].card_image_url;
+
+    // Step 2: localStorageからユーザー名＋夢タイプを取得してフォールバック検索
+    console.log("🔍 [DEBUG] フィンガープリントでヒットせず、ユーザー名+夢タイプで検索します");
+
+    const savedData = getSavedDiagnosisData();
+    if (savedData?.userName && savedData?.dreamType) {
+      console.log(`🔍 [DEBUG] 検索条件: userName=${savedData.userName}, dreamType=${savedData.dreamType}`);
+
+      const { data: nameData, error: nameError } = await supabase
+        .from("diagnosis_records")
+        .select("card_image_url")
+        .eq("user_name", savedData.userName)
+        .eq("dream_type", savedData.dreamType)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (nameError) {
+        console.error("Supabase name+type検索エラー:", nameError);
+        return null;
+      }
+
+      if (nameData && nameData.length > 0 && nameData[0].card_image_url) {
+        console.log("✅ [ユーザー名+夢タイプ] カード画像URLを取得:", nameData[0].card_image_url.substring(0, 80));
+        return nameData[0].card_image_url;
+      }
     }
-    
+
+    console.log("⚠️ Supabaseにカード画像URLが見つかりませんでした");
     return null;
   } catch (error) {
     console.error("getSavedCardImageUrl error:", error);
