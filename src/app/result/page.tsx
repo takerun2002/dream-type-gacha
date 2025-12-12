@@ -317,13 +317,14 @@ export default function ResultPage() {
           fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-success',message:'Base64カード画像復元成功',data:{base64Length:savedCardImage.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
           // #endregion
         } else {
-          // 古いBlob URLは無効なのでクリア
-          console.log("⚠️ 古いBlob URLを検出、クリアして再生成を促します");
+          // 古いBlob URLまたはその他の無効なURLは無視してクリア
+          // （カード生成は下のuseEffectで自動的に開始される）
+          console.log("⚠️ 古いBlob URLを検出、クリアします");
           localStorage.removeItem(CARD_IMAGE_STORAGE_KEY);
-          setCardImageLoadError(true); // 再生成UIを表示
+          // cardGenerated=false のままにして、下のuseEffectで自動的に再生成を開始
           
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-blob-cleared',message:'古いBlob URLをクリア',data:{clearedUrl:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H9-blobcheck'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'result/page.tsx:restore-blob-cleared',message:'古いBlob URLをクリア、自動再生成へ',data:{clearedUrl:savedCardImage.substring(0,80)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H10-autoregen'})}).catch(()=>{});
           // #endregion
         }
       } else {
