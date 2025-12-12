@@ -32,6 +32,9 @@ fal.config({
 // Supabaseクライアント（ログ記録用）
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Discord Webhook URL
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
@@ -39,9 +42,6 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminSupabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
   : null;
-
-// 🔍 デバッグ: Supabaseクライアント初期化状態
-console.log(`🔍 Supabase初期化状態: supabase=${!!supabase}, adminSupabase=${!!adminSupabase}, hasServiceKey=${!!supabaseServiceKey}`);
 
 // ログ記録ヘルパー（adminSupabaseを優先使用）
 async function logGeneration(
@@ -53,17 +53,10 @@ async function logGeneration(
   cardImageUrl?: string,
   cardImageBase64?: string
 ) {
-  console.log(`🔍 logGeneration呼び出し: userName=${userName}, dreamType=${dreamType}, success=${success}`);
-  console.log(`🔍 logGeneration パラメータ: cardImageUrl=${cardImageUrl ? 'あり(' + cardImageUrl.substring(0, 50) + '...)' : 'なし'}`);
-  console.log(`🔍 logGeneration パラメータ: cardImageBase64=${cardImageBase64 ? 'あり(' + cardImageBase64.length + '文字)' : 'なし'}`);
-
   // adminSupabase（service role）を優先、なければ通常のsupabaseを使用
   const client = adminSupabase || supabase;
-  const clientType = adminSupabase ? 'adminSupabase(service_role)' : (supabase ? 'supabase(anon)' : 'なし');
-  console.log(`🔍 使用クライアント: ${clientType}`);
-
   if (!client) {
-    console.error("❌ logGeneration: Supabaseクライアントが未初期化 - 保存をスキップ");
+    console.error("❌ logGeneration: Supabaseクライアントが未初期化");
     return;
   }
 
@@ -81,45 +74,133 @@ async function logGeneration(
     if (cardImageBase64) {
       payload.card_image_base64 = cardImageBase64;
       console.log(`📦 Base64データサイズ: ${cardImageBase64.length} 文字`);
-    } else {
-      console.warn(`⚠️ cardImageBase64がundefined/nullです！`);
     }
 
     console.log(`📝 generation_logs にInsert開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
-    console.log(`📝 payloadキー: ${Object.keys(payload).join(', ')}`);
 
     const { data, error } = await client.from("generation_logs").insert(payload).select();
 
     if (error) {
       console.error("❌ generation_logs Insert エラー:", error.message);
-      console.error("❌ エラーコード:", error.code);
       console.error("❌ エラー詳細:", JSON.stringify(error));
     } else {
-      console.log("✅ generation_logs Insert 成功:", JSON.stringify(data));
+      console.log("✅ generation_logs Insert 成功:", data);
     }
   } catch (error) {
     console.error("❌ Log recording error:", error);
-    if (error instanceof Error) {
-      console.error("❌ エラースタック:", error.stack);
+  }
+}
+
+// Discord通知ヘルパー（カード生成完了時）
+async function notifyDiscordCardGenerated(
+  userName: string,
+  dreamType: string,
+  cardImageUrl: string | null
+) {
+  if (!DISCORD_WEBHOOK_URL) {
+    console.log("⚠️ DISCORD_WEBHOOK_URL未設定のためDiscord通知スキップ");
+    return;
+  }
+
+  try {
+    // 夢タイプの日本語名マッピング
+    const dreamTypeNames: Record<string, string> = {
+      phoenix: "不死鳥",
+      dragon: "龍",
+      wolf: "狼",
+      deer: "鹿",
+      fox: "妖狐",
+      kitsune: "妖狐",
+      turtle: "亀",
+      pegasus: "ペガサス",
+      elephant: "象",
+      shark: "シャーク",
+    };
+
+    const dreamTypeName = dreamTypeNames[dreamType] || dreamType;
+    const timestamp = new Date().toISOString();
+
+    // Discord Embed形式のペイロード
+    const discordPayload: {
+      content: string;
+      embeds: Array<{
+        title: string;
+        color: number;
+        fields: Array<{ name: string; value: string; inline: boolean }>;
+        image?: { url: string };
+        timestamp: string;
+        footer: { text: string };
+      }>;
+    } = {
+      content: "🎴 **新しいカードが生成されました**",
+      embeds: [
+        {
+          title: "カード生成完了",
+          color: 0x22c55e, // 緑色
+          fields: [
+            {
+              name: "👤 ユーザー名",
+              value: userName || "不明",
+              inline: true,
+            },
+            {
+              name: "🎴 夢タイプ",
+              value: dreamTypeName,
+              inline: true,
+            },
+          ],
+          timestamp,
+          footer: {
+            text: "夢タイプ診断ガチャ",
+          },
+        },
+      ],
+    };
+
+    // 画像URLがある場合は添付
+    if (cardImageUrl) {
+      discordPayload.embeds[0].image = { url: cardImageUrl };
+      discordPayload.embeds[0].fields.push({
+        name: "🔗 画像URL",
+        value: cardImageUrl,
+        inline: false,
+      });
     }
+
+    const response = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(discordPayload),
+    });
+
+    if (response.ok) {
+      console.log("✅ Discord通知送信成功（カード生成）");
+    } else {
+      console.error("❌ Discord通知送信失敗:", await response.text());
+    }
+  } catch (error) {
+    console.error("❌ Discord通知エラー:", error);
   }
 }
 
 // カード画像をSupabase Storageにアップロードし、公開URLを返す
 // 優先: service role (adminSupabase)。失敗・未設定時は anon クライアントでフォールバック試行。
+// バケット名: card-images（マイグレーションと統一）
 async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType: string): Promise<string | null> {
-  const fileName = `${Date.now()}-${encodeURIComponent(userName)}-${dreamType}.png`;
+  // ファイル名は日本語を避けてタイムスタンプとdreamTypeのみ（Supabase Storageの制約対応）
+  const fileName = `${Date.now()}-${dreamType}.png`;
+  const bucketName = "card-images";
 
   // 1) Service role でアップロード（推奨）
   if (adminSupabase) {
     try {
       // バケット存在確認
       const { data: buckets } = await adminSupabase.storage.listBuckets();
-      const cardsExists = buckets?.some((b) => b.name === "cards");
+      const bucketExists = buckets?.some((b) => b.id === bucketName);
 
-      if (!cardsExists) {
-        console.log("📦 cardsバケットを作成中...(service role)");
-        const { error: bucketError } = await adminSupabase.storage.createBucket("cards", {
+      if (!bucketExists) {
+        console.log(`📦 ${bucketName}バケットを作成中...(service role)`);
+        const { error: bucketError } = await adminSupabase.storage.createBucket(bucketName, {
           public: true,
           fileSizeLimit: 5242880, // 5MB
           allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
@@ -127,14 +208,14 @@ async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType:
         if (bucketError) {
           console.error("❌ バケット作成エラー (service role):", bucketError.message);
         } else {
-          console.log("✅ cardsバケット作成成功 (service role)");
+          console.log(`✅ ${bucketName}バケット作成成功 (service role)`);
         }
       }
 
       console.log(`📤 画像アップロード開始 (service role): ${fileName} (${imageBuffer.length} bytes)`);
 
       const { data: uploadData, error: uploadError } = await adminSupabase.storage
-        .from("cards")
+        .from(bucketName)
         .upload(fileName, imageBuffer, {
           contentType: "image/png",
           upsert: true, // 同名ファイルは上書き
@@ -142,7 +223,7 @@ async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType:
 
       if (!uploadError) {
         console.log("✅ アップロード成功 (service role):", uploadData?.path);
-        const { data: publicUrlData } = adminSupabase.storage.from("cards").getPublicUrl(fileName);
+        const { data: publicUrlData } = adminSupabase.storage.from(bucketName).getPublicUrl(fileName);
         const publicUrl = publicUrlData?.publicUrl || null;
         console.log("🔗 公開URL:", publicUrl);
         if (publicUrl) return publicUrl;
@@ -161,14 +242,14 @@ async function uploadCardImage(imageBuffer: Buffer, userName: string, dreamType:
     try {
       console.warn("⚠️ service role unavailable. Trying anon upload fallback...");
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("cards")
+        .from(bucketName)
         .upload(fileName, imageBuffer, {
           contentType: "image/png",
           upsert: true,
         });
       if (!uploadError) {
         console.log("✅ アップロード成功 (anon fallback):", uploadData?.path);
-        const { data: publicUrlData } = supabase.storage.from("cards").getPublicUrl(fileName);
+        const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
         const publicUrl = publicUrlData?.publicUrl || null;
         console.log("🔗 公開URL (anon fallback):", publicUrl);
         return publicUrl;
@@ -759,17 +840,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // 診断レコードにも保存（あれば）
     const dbClient = adminSupabase || supabase;
-    const dbClientType = adminSupabase ? 'adminSupabase(service_role)' : (supabase ? 'supabase(anon)' : 'なし');
-    console.log(`🔍 diagnosis_records更新 使用クライアント: ${dbClientType}`);
-
     if (dbClient) {
       try {
         const updateData: { card_image_url?: string; card_image_base64?: string } = {};
         if (cardImageUrl) updateData.card_image_url = cardImageUrl;
         updateData.card_image_base64 = cardImageBase64;
 
-        console.log(`📝 diagnosis_records 更新開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}, base64Length=${cardImageBase64.length}`);
-        console.log(`📝 updateDataキー: ${Object.keys(updateData).join(', ')}`);
+        console.log(`📝 diagnosis_records 更新開始: userName=${userName}, hasUrl=${!!cardImageUrl}, hasBase64=${!!cardImageBase64}`);
 
         const { data: updateResult, error: updateError } = await dbClient
           .from('diagnosis_records')
@@ -779,21 +856,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         if (updateError) {
           console.error('❌ diagnosis_records 更新エラー:', updateError.message);
-          console.error('❌ エラーコード:', updateError.code);
           console.error('❌ エラー詳細:', JSON.stringify(updateError));
         } else {
-          console.log(`✅ diagnosis_records 更新成功: 更新件数=${updateResult?.length || 0}`);
-          if (updateResult && updateResult.length > 0) {
-            console.log(`✅ 更新されたレコードID: ${updateResult.map((r: { id?: string | number }) => r.id).join(', ')}`);
-          } else {
-            console.warn(`⚠️ diagnosis_records 更新: 該当レコードが0件（userName="${userName}" が存在しない可能性）`);
-          }
+          console.log(`✅ diagnosis_records 更新成功:`, updateResult);
         }
       } catch (e) {
         console.error('❌ diagnosis_records 更新に失敗:', e);
-        if (e instanceof Error) {
-          console.error('❌ エラースタック:', e.stack);
-        }
       }
     } else {
       console.error('❌ diagnosis_records 更新スキップ: Supabaseクライアントなし');
@@ -802,6 +870,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // 成功ログ記録（Base64も含む）
     console.log(`📝 生成ログ記録: userName=${userName}, dreamType=${dreamType}, cardImageUrl=${cardImageUrl || 'null'}`);
     await logGeneration(userName, dreamType, true, undefined, 'gemini', cardImageUrl || undefined, cardImageBase64);
+
+    // Discord通知（カード生成完了）
+    await notifyDiscordCardGenerated(userName, dreamType, cardImageUrl);
 
     return new NextResponse(imageBuffer, {
       status: 200,

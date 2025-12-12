@@ -11,7 +11,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { password, action, page = 1, limit = 50, searchQuery } = body;
+    const { password } = body;
 
     // パスワード認証
     if (password !== ADMIN_PASSWORD) {
@@ -39,184 +39,7 @@ export async function POST(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    // アクション別処理
-    if (action === "getAllRecords") {
-      // 全診断記録（ページネーション）
-      const offset = (page - 1) * limit;
-      
-      // diagnosis_recordsを取得
-      let query = supabase
-        .from("diagnosis_records")
-        .select("id, user_name, dream_type, created_at, fingerprint, ip_address, card_image_url", { count: "exact" });
-      
-      // 検索クエリがある場合
-      if (searchQuery && searchQuery.trim()) {
-        query = query.ilike("user_name", `%${searchQuery.trim()}%`);
-      }
-      
-      const { data, count, error } = await query
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1);
-      
-      if (error) {
-        return NextResponse.json({
-          success: false,
-          error: "データ取得に失敗: " + error.message,
-        });
-      }
-      
-      // diagnosis_recordsにcard_image_urlがない場合、generation_logsから補完
-      const records = data || [];
-      const userNames = records.map(r => r.user_name);
-      
-      if (userNames.length > 0) {
-        // generation_logsから各ユーザーの最新の成功ログを取得（URLとBase64の両方）
-        const { data: logs } = await supabase
-          .from("generation_logs")
-          .select("user_name, card_image_url, card_image_base64")
-          .in("user_name", userNames)
-          .eq("success", true)
-          .order("created_at", { ascending: false });
-        
-        // ユーザー名 → 画像データ（URL優先、なければBase64）のマップを作成
-        const imageDataMap = new Map<string, { url?: string; base64?: string }>();
-        if (logs) {
-          for (const log of logs) {
-            if (!imageDataMap.has(log.user_name)) {
-              const data: { url?: string; base64?: string } = {};
-              if (log.card_image_url) data.url = log.card_image_url;
-              if (log.card_image_base64) data.base64 = log.card_image_base64;
-              if (data.url || data.base64) {
-                imageDataMap.set(log.user_name, data);
-              }
-            }
-          }
-        }
-        
-        // recordsに画像データを補完
-        for (const record of records) {
-          if (!record.card_image_url && imageDataMap.has(record.user_name)) {
-            const imageData = imageDataMap.get(record.user_name)!;
-            if (imageData.url) {
-              record.card_image_url = imageData.url;
-            } else if (imageData.base64) {
-              // Base64データをcard_image_urlとして使用（管理画面でdata URIとして表示）
-              record.card_image_url = imageData.base64;
-            }
-          }
-        }
-      }
-      
-      return NextResponse.json({
-        success: true,
-        records,
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      });
-    }
-
-    // 単一ユーザーの詳細取得
-    if (action === "getUserDetail") {
-      const { recordId } = body;
-      
-      const { data, error } = await supabase
-        .from("diagnosis_records")
-        .select("*")
-        .eq("id", recordId)
-        .single();
-      
-      if (error) {
-        return NextResponse.json({
-          success: false,
-          error: "詳細取得に失敗: " + error.message,
-        });
-      }
-      
-      // 該当ユーザーの生成ログも取得（card_image_urlとBase64含む）
-      const { data: logData } = await supabase
-        .from("generation_logs")
-        .select("*")
-        .eq("user_name", data.user_name)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      
-      // diagnosis_recordsにcard_image_urlがない場合、generation_logsから補完
-      let cardImageUrl = data.card_image_url;
-      if (!cardImageUrl && logData) {
-        const successLog = logData.find((log: { success: boolean; card_image_url?: string; card_image_base64?: string }) => 
-          log.success && (log.card_image_url || log.card_image_base64)
-        );
-        if (successLog) {
-          // URL優先、なければBase64
-          cardImageUrl = successLog.card_image_url || successLog.card_image_base64;
-        }
-      }
-      
-      return NextResponse.json({
-        success: true,
-        record: { ...data, card_image_url: cardImageUrl },
-        generationLogs: logData || [],
-      });
-    }
-
-    if (action === "getErrorLogs") {
-      // エラーログ取得
-      const offset = (page - 1) * limit;
-      
-      const { data, count, error } = await supabase
-        .from("generation_logs")
-        .select("*", { count: "exact" })
-        .eq("success", false)
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1);
-      
-      if (error) {
-        return NextResponse.json({
-          success: false,
-          error: "エラーログ取得に失敗: " + error.message,
-        });
-      }
-      
-      return NextResponse.json({
-        success: true,
-        logs: data || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      });
-    }
-
-    if (action === "getAllLogs") {
-      // 全カード生成ログ取得
-      const offset = (page - 1) * limit;
-      
-      const { data, count, error } = await supabase
-        .from("generation_logs")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1);
-      
-      if (error) {
-        return NextResponse.json({
-          success: false,
-          error: "ログ取得に失敗: " + error.message,
-        });
-      }
-      
-      return NextResponse.json({
-        success: true,
-        logs: data || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      });
-    }
-
-    // 統計データを取得（デフォルト）
+    // 統計データを取得
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -245,65 +68,74 @@ export async function POST(request: Request) {
       });
     }
 
-    // 時間帯別分布（過去7日）- PVとUPV
+    // 時間帯別分布（過去7日）
     const { data: hourlyData } = await supabase
       .from("diagnosis_records")
-      .select("created_at, fingerprint")
+      .select("created_at")
       .gte("created_at", weekAgo);
 
     const hourlyDistribution: number[] = new Array(24).fill(0);
-    const hourlyUniqueDistribution: number[] = new Array(24).fill(0);
-    const hourlyUniqueUsers: Set<string>[] = Array.from({ length: 24 }, () => new Set());
-    
     if (hourlyData) {
       hourlyData.forEach((record) => {
         const hour = new Date(record.created_at).getHours();
         hourlyDistribution[hour]++;
-        if (record.fingerprint) {
-          hourlyUniqueUsers[hour].add(record.fingerprint);
-        }
       });
-      // ユニークユーザー数を設定
-      for (let i = 0; i < 24; i++) {
-        hourlyUniqueDistribution[i] = hourlyUniqueUsers[i].size;
-      }
-    }
-    
-    // 日別分布（過去7日）
-    const dailyDistribution: { date: string; pv: number; upv: number }[] = [];
-    const dailyUsers: Map<string, Set<string>> = new Map();
-    const dailyPV: Map<string, number> = new Map();
-    
-    if (hourlyData) {
-      hourlyData.forEach((record) => {
-        const date = new Date(record.created_at).toISOString().split('T')[0];
-        dailyPV.set(date, (dailyPV.get(date) || 0) + 1);
-        if (!dailyUsers.has(date)) {
-          dailyUsers.set(date, new Set());
-        }
-        if (record.fingerprint) {
-          dailyUsers.get(date)!.add(record.fingerprint);
-        }
-      });
-      
-      // 過去7日間のデータを生成
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        const dateStr = date.toISOString().split('T')[0];
-        dailyDistribution.push({
-          date: dateStr,
-          pv: dailyPV.get(dateStr) || 0,
-          upv: dailyUsers.get(dateStr)?.size || 0,
-        });
-      }
     }
 
-    // 最近の診断（最新10件）
-    const { data: recentDiagnoses } = await supabase
+    // 全ユーザーの診断記録を取得（新しい順）
+    const { data: allDiagnosesRaw } = await supabase
       .from("diagnosis_records")
-      .select("user_name, dream_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .select("id, user_name, dream_type, created_at, ip_address, fingerprint, user_agent")
+      .order("created_at", { ascending: false });
+
+    // 各診断に対応するカード画像のフラグを取得（Base64は返さない）
+    interface DiagnosisWithCard {
+      id: string;
+      user_name: string;
+      dream_type: string;
+      created_at: string;
+      ip_address?: string;
+      fingerprint?: string;
+      user_agent?: string;
+      card_image_url?: string;
+      has_card_image?: boolean;
+    }
+
+    const recentDiagnoses: DiagnosisWithCard[] = [];
+
+    if (allDiagnosesRaw) {
+      // カード画像URLを持つユーザー名を一括取得
+      const { data: cardDataAll } = await supabase
+        .from("generation_logs")
+        .select("user_name, card_image_url, card_image_base64")
+        .eq("success", true);
+
+      // ユーザー名→画像データのマップを作成
+      const cardImageMap = new Map<string, { url?: string; hasBase64: boolean }>();
+      if (cardDataAll) {
+        for (const card of cardDataAll) {
+          // 同じユーザーの最新のカード情報を保持
+          if (!cardImageMap.has(card.user_name)) {
+            cardImageMap.set(card.user_name, {
+              url: card.card_image_url || undefined,
+              hasBase64: !!card.card_image_base64,
+            });
+          }
+        }
+      }
+
+      for (const diagnosis of allDiagnosesRaw) {
+        const diagnosisWithCard: DiagnosisWithCard = { ...diagnosis };
+        const cardInfo = cardImageMap.get(diagnosis.user_name);
+
+        if (cardInfo) {
+          diagnosisWithCard.card_image_url = cardInfo.url;
+          diagnosisWithCard.has_card_image = !!(cardInfo.url || cardInfo.hasBase64);
+        }
+
+        recentDiagnoses.push(diagnosisWithCard);
+      }
+    }
 
     // キュー状態
     const { count: waitingCount } = await supabase
@@ -335,6 +167,65 @@ export async function POST(request: Request) {
       log => new Date(log.created_at) > oneHourAgo
     ).length || 0;
 
+    // 問い合わせ統計
+    interface SupportInquiry {
+      id: string;
+      created_at: string;
+      user_name: string | null;
+      dream_type: string | null;
+      fingerprint: string | null;
+      issue_summary: string;
+      conversation: unknown;
+      status: string;
+      resolved_at: string | null;
+      notes: string | null;
+    }
+
+    let supportInquiries: SupportInquiry[] = [];
+    let supportStats = {
+      total: 0,
+      open: 0,
+      inProgress: 0,
+      resolved: 0,
+    };
+
+    try {
+      const { data: inquiriesData, count: totalInquiries } = await supabase
+        .from("support_inquiries")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (inquiriesData) {
+        supportInquiries = inquiriesData as SupportInquiry[];
+      }
+
+      // ステータス別カウント
+      const { count: openCount } = await supabase
+        .from("support_inquiries")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "open");
+
+      const { count: inProgressCount } = await supabase
+        .from("support_inquiries")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "in_progress");
+
+      const { count: resolvedCount } = await supabase
+        .from("support_inquiries")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "resolved");
+
+      supportStats = {
+        total: totalInquiries || 0,
+        open: openCount || 0,
+        inProgress: inProgressCount || 0,
+        resolved: resolvedCount || 0,
+      };
+    } catch (supportError) {
+      console.log("support_inquiries テーブル未作成の可能性:", supportError);
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -342,8 +233,6 @@ export async function POST(request: Request) {
         todayDiagnoses: todayDiagnoses || 0,
         typeDistribution,
         hourlyDistribution,
-        hourlyUniqueDistribution,
-        dailyDistribution,
         recentDiagnoses: recentDiagnoses || [],
         queueStatus: {
           waiting: waitingCount || 0,
@@ -356,6 +245,8 @@ export async function POST(request: Request) {
           successRate: Math.round(successRate * 10) / 10,
           recentHour: recentGenerations,
         },
+        supportInquiries,
+        supportStats,
       },
     });
   } catch (error) {

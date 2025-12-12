@@ -1,26 +1,13 @@
-console.log("🔍 [diagnose] モジュール読み込み開始");
-
 import { NextRequest, NextResponse } from "next/server";
-console.log("🔍 [diagnose] next/server OK");
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
-console.log("🔍 [diagnose] @google/generative-ai OK");
-
 import { dreamTypes } from "@/lib/dreamTypes";
-console.log("🔍 [diagnose] dreamTypes OK");
-
 import { calculateResult, calculateScores } from "@/lib/questions";
-console.log("🔍 [diagnose] questions OK");
-
 import { calculateDailyStem, FourPillarsData } from "@/lib/fourPillars";
-console.log("🔍 [diagnose] fourPillars OK");
-
-import {
-  DreamTypeDiagnosisEngine,
+import { 
+  DreamTypeDiagnosisEngine, 
   FortuneDiagnosisResult,
-  ELEMENT_INFO
+  ELEMENT_INFO 
 } from "@/lib/fortuneEngine";
-console.log("🔍 [diagnose] fortuneEngine OK - 全モジュール読み込み完了");
 
 // 🔐 APIキーチェック（サーバーサイドのみ）
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -147,29 +134,21 @@ ${Object.entries(scores)
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔍 [diagnose] POST開始");
   try {
-    console.log("🔍 [diagnose] リクエストボディ解析中...");
     const body = await request.json();
-    console.log("🔍 [diagnose] ボディ取得OK:", JSON.stringify(body).substring(0, 200));
     const { name, answers, birthDate } = body;
 
     if (!name || !answers || !Array.isArray(answers)) {
-      console.log("🔍 [diagnose] バリデーションエラー: name or answers missing");
       return NextResponse.json(
         { success: false, error: "名前と回答が必要です" },
         { status: 400 }
       );
     }
 
-    console.log("🔍 [diagnose] calculateResult呼び出し...");
     // 質問回答から診断結果を計算
     const resultType = calculateResult(answers);
-    console.log("🔍 [diagnose] resultType:", resultType);
     const scores = calculateScores(answers);
-    console.log("🔍 [diagnose] scores OK");
     const typeData = dreamTypes[resultType];
-    console.log("🔍 [diagnose] typeData:", typeData ? "OK" : "NULL");
 
     if (!typeData) {
       return NextResponse.json(

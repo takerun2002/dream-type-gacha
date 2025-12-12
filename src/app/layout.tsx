@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_JP, Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
+import RASChatBotWrapper from "@/components/RASChatBotWrapper";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -36,6 +37,7 @@ export default function RootLayout({
         className={`${notoSansJP.variable} ${zenMaruGothic.variable} antialiased bg-gradient-dream min-h-screen`}
       >
         {children}
+        <RASChatBotWrapper />
       </body>
     </html>
   );

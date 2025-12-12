@@ -775,3 +775,61 @@ body {
     min-height: auto;
   }
 }
+
+/* ============================================
+   RASくんチャットボット - スピリチュアル効果
+   ============================================ */
+
+/* 浮遊アニメーション */
+.ras-float {
+  animation: ras-float 2s ease-in-out infinite;
+}
+
+@keyframes ras-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+/* パルスグロー効果 */
+.ras-pulse-glow {
+  animation: ras-pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes ras-pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 20px rgba(255, 165, 0, 0.5),
+      0 0 40px rgba(255, 69, 0, 0.3),
+      0 0 60px rgba(255, 105, 180, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(255, 165, 0, 0.8),
+      0 0 60px rgba(255, 69, 0, 0.5),
+      0 0 80px rgba(255, 105, 180, 0.4);
+  }
+}
+
+/* キラキラエフェクト */
+@keyframes ras-sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+/* ホバー時のグロー強化 */
+.ras-float:hover {
+  animation: ras-float 1.5s ease-in-out infinite;
+}
+
+.ras-pulse-glow:hover {
+  box-shadow:
+    0 0 40px rgba(255, 165, 0, 1),
+    0 0 80px rgba(255, 69, 0, 0.7),
+    0 0 100px rgba(255, 105, 180, 0.5) !important;
+}

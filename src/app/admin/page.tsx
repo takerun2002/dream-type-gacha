@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
 
 // 管理者パスワード（環境変数で設定可能）
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin2025";
@@ -10,13 +9,6 @@ const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "kinmanadmin202
 // タイプ名のマッピング
 const TYPE_NAMES: Record<string, string> = {
   phoenix: "🔥 不死鳥",
-  butterfly: "🦋 変容の蝶",
-  star: "⭐ 導きの星",
-  spring: "💧 癒しの泉",
-  flame: "🎨 創造の炎",
-  tree: "🌳 知恵の樹",
-  wind: "🌀 冒険の風",
-  shield: "🛡️ 守護の盾",
   dragon: "🐉 龍",
   wolf: "🐺 狼",
   deer: "🦌 鹿",
@@ -29,14 +21,7 @@ const TYPE_NAMES: Record<string, string> = {
 
 // タイプの色
 const TYPE_COLORS: Record<string, string> = {
-  phoenix: "#ef4444",
-  butterfly: "#ec4899",
-  star: "#fbbf24",
-  spring: "#06b6d4",
-  flame: "#f97316",
-  tree: "#22c55e",
-  wind: "#8b5cf6",
-  shield: "#3b82f6",
+  phoenix: "#ff6b6b",
   dragon: "#ffd93d",
   wolf: "#6bcb77",
   deer: "#4d96ff",
@@ -47,18 +32,38 @@ const TYPE_COLORS: Record<string, string> = {
   shark: "#339af0",
 };
 
+interface RecentDiagnosis {
+  id: string;
+  user_name: string;
+  dream_type: string;
+  created_at: string;
+  ip_address?: string;
+  fingerprint?: string;
+  user_agent?: string;
+  card_image_url?: string;
+  card_image_base64?: string;
+  has_card_image?: boolean;
+}
+
+interface SupportInquiry {
+  id: string;
+  created_at: string;
+  user_name: string | null;
+  dream_type: string | null;
+  fingerprint: string | null;
+  issue_summary: string;
+  conversation: { role: string; content: string }[];
+  status: "open" | "in_progress" | "resolved";
+  resolved_at: string | null;
+  notes: string | null;
+}
+
 interface Stats {
   totalDiagnoses: number;
   todayDiagnoses: number;
   typeDistribution: Record<string, number>;
   hourlyDistribution: number[];
-  hourlyUniqueDistribution: number[];
-  dailyDistribution: Array<{ date: string; pv: number; upv: number }>;
-  recentDiagnoses: Array<{
-    user_name: string;
-    dream_type: string;
-    created_at: string;
-  }>;
+  recentDiagnoses: RecentDiagnosis[];
   queueStatus: {
     waiting: number;
     processing: number;
@@ -70,131 +75,44 @@ interface Stats {
     successRate: number;
     recentHour: number;
   };
+  supportInquiries: SupportInquiry[];
+  supportStats: {
+    total: number;
+    open: number;
+    inProgress: number;
+    resolved: number;
+  };
 }
 
-interface DiagnosisRecord {
+interface SearchResult {
   id: string;
   user_name: string;
   dream_type: string;
   created_at: string;
   fingerprint: string;
-  ip_address?: string;
-  card_image_url?: string | null;
-  card_image_base64?: string | null;
-}
-
-interface GenerationLog {
-  id: string;
-  user_name: string;
-  dream_type: string;
-  success: boolean;
-  error_message?: string;
-  card_image_url?: string | null;
-  card_image_base64?: string | null;
-  created_at: string;
-  generation_time_ms?: number;
-  method?: string;
-}
-
-interface PaginatedRecords {
-  records: DiagnosisRecord[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-interface PaginatedLogs {
-  logs: GenerationLog[];
-  total: number;
-  page: number;
-  totalPages: number;
-}
-
-// 画像ダウンロード用ヘルパー関数
-function downloadImage(imageData: string, fileName: string) {
-  const link = document.createElement("a");
-
-  if (imageData.startsWith("data:")) {
-    // Base64データの場合
-    link.href = imageData;
-  } else {
-    // URLの場合はそのまま使用
-    link.href = imageData;
-  }
-
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-// Base64データをBlobに変換してダウンロード
-async function downloadBase64Image(base64Data: string, fileName: string) {
-  try {
-    // data:image/png;base64, プレフィックスを処理
-    const base64Content = base64Data.includes(",")
-      ? base64Data.split(",")[1]
-      : base64Data;
-
-    const byteCharacters = atob(base64Content);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    const blob = new Blob([byteArray], { type: "image/png" });
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error("Download error:", error);
-    alert("ダウンロードに失敗しました");
-  }
 }
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "records" | "logs" | "errors" | "data">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "data" | "logs" | "users" | "support">("dashboard");
+  // サポート問い合わせ関連
+  const [selectedInquiry, setSelectedInquiry] = useState<SupportInquiry | null>(null);
+  const [inquiryStatusUpdating, setInquiryStatusUpdating] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [clearStatus, setClearStatus] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-
-  // 全診断記録
-  const [allRecords, setAllRecords] = useState<PaginatedRecords | null>(null);
-  const [recordsPage, setRecordsPage] = useState(1);
-  const [recordsSearchQuery, setRecordsSearchQuery] = useState("");
-  const [recordsLoading, setRecordsLoading] = useState(false);
-
-  // カード生成ログ
-  const [generationLogs, setGenerationLogs] = useState<PaginatedLogs | null>(null);
-  const [logsPage, setLogsPage] = useState(1);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [logsFilter, setLogsFilter] = useState<"all" | "success" | "failed">("all");
-
-  // エラーログ
-  const [errorLogs, setErrorLogs] = useState<PaginatedLogs | null>(null);
-  const [errorsPage, setErrorsPage] = useState(1);
-  const [errorsLoading, setErrorsLoading] = useState(false);
-
-  // 削除ステータス
+  // ユーザー検索・削除
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState<string | null>(null);
-
-  // 詳細モーダル
-  const [selectedRecord, setSelectedRecord] = useState<DiagnosisRecord | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-
-  // 画像プレビューモーダル
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [previewUserName, setPreviewUserName] = useState<string>("");
+  // カード画像モーダル
+  const [selectedCard, setSelectedCard] = useState<RecentDiagnosis | null>(null);
+  const [cardImageLoading, setCardImageLoading] = useState(false);
+  const [cardImageCache, setCardImageCache] = useState<Record<string, string>>({});
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,7 +153,7 @@ export default function AdminPage() {
   // 自動更新
   useEffect(() => {
     if (autoRefresh && isAuthenticated) {
-      const interval = setInterval(fetchStats, 10000);
+      const interval = setInterval(fetchStats, 10000); // 10秒ごと
       return () => clearInterval(interval);
     }
   }, [autoRefresh, isAuthenticated, fetchStats]);
@@ -275,97 +193,31 @@ export default function AdminPage() {
     setClearStatus("✅ 完全リセット完了！");
   };
 
-  // 全診断記録を取得
-  const fetchAllRecords = useCallback(async (page = 1, search = "") => {
-    setRecordsLoading(true);
+  // ユーザー検索
+  const searchUsers = async () => {
+    if (!searchQuery.trim()) return;
+    setSearchLoading(true);
+    setDeleteStatus(null);
     try {
-      const response = await fetch("/api/admin/stats", {
+      const response = await fetch("/api/admin/clear-records", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: ADMIN_PASSWORD,
-          action: "getAllRecords",
-          page,
-          limit: 20,
-          searchQuery: search
-        }),
+        body: JSON.stringify({ password: ADMIN_PASSWORD, searchQuery: searchQuery.trim() }),
       });
       const data = await response.json();
       if (data.success) {
-        setAllRecords({
-          records: data.records,
-          total: data.total,
-          page: data.page,
-          totalPages: data.totalPages,
-        });
-        setRecordsPage(page);
+        setSearchResults(data.records || []);
+        if (data.records?.length === 0) {
+          setDeleteStatus("🔍 該当するユーザーが見つかりません");
+        }
+      } else {
+        setDeleteStatus("❌ " + data.error);
       }
     } catch (error) {
-      console.error("Records fetch error:", error);
+      setDeleteStatus("❌ 検索に失敗: " + (error as Error).message);
     }
-    setRecordsLoading(false);
-  }, []);
-
-  // カード生成ログを取得
-  const fetchGenerationLogs = useCallback(async (page = 1, filter: "all" | "success" | "failed" = "all") => {
-    setLogsLoading(true);
-    try {
-      const response = await fetch("/api/admin/stats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: ADMIN_PASSWORD,
-          action: "getAllLogs",
-          page,
-          limit: 20,
-          filter
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setGenerationLogs({
-          logs: data.logs,
-          total: data.total,
-          page: data.page,
-          totalPages: data.totalPages,
-        });
-        setLogsPage(page);
-      }
-    } catch (error) {
-      console.error("Logs fetch error:", error);
-    }
-    setLogsLoading(false);
-  }, []);
-
-  // エラーログを取得
-  const fetchErrorLogs = useCallback(async (page = 1) => {
-    setErrorsLoading(true);
-    try {
-      const response = await fetch("/api/admin/stats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          password: ADMIN_PASSWORD,
-          action: "getErrorLogs",
-          page,
-          limit: 20
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setErrorLogs({
-          logs: data.logs,
-          total: data.total,
-          page: data.page,
-          totalPages: data.totalPages,
-        });
-        setErrorsPage(page);
-      }
-    } catch (error) {
-      console.error("Error logs fetch error:", error);
-    }
-    setErrorsLoading(false);
-  }, []);
+    setSearchLoading(false);
+  };
 
   // ユーザー削除
   const deleteUser = async (userName: string) => {
@@ -382,9 +234,10 @@ export default function AdminPage() {
       const data = await response.json();
       if (data.success) {
         setDeleteStatus("✅ " + data.message);
-        fetchAllRecords(recordsPage, recordsSearchQuery);
+        // 検索結果から削除
+        setSearchResults(prev => prev.filter(r => r.user_name !== userName));
+        // 統計を更新
         fetchStats();
-        setTimeout(() => setDeleteStatus(null), 3000);
       } else {
         setDeleteStatus("❌ " + data.error);
       }
@@ -393,68 +246,66 @@ export default function AdminPage() {
     }
   };
 
-  // タブ切り替え時にデータを取得
-  useEffect(() => {
-    if (isAuthenticated) {
-      if (activeTab === "records" && !allRecords) {
-        fetchAllRecords(1, "");
-      } else if (activeTab === "logs" && !generationLogs) {
-        fetchGenerationLogs(1, logsFilter);
-      } else if (activeTab === "errors" && !errorLogs) {
-        fetchErrorLogs(1);
-      }
+  // 個別のカード画像を取得
+  const fetchCardImage = useCallback(async (userName: string): Promise<string | null> => {
+    // キャッシュがあればそれを返す
+    if (cardImageCache[userName]) {
+      return cardImageCache[userName];
     }
-  }, [activeTab, isAuthenticated, allRecords, generationLogs, errorLogs, fetchAllRecords, fetchGenerationLogs, fetchErrorLogs, logsFilter]);
 
-  // 検索実行（即座に）
-  const handleSearch = () => {
-    fetchAllRecords(1, recordsSearchQuery);
-  };
+    try {
+      const response = await fetch("/api/admin/card-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: ADMIN_PASSWORD, userName }),
+      });
+      const data = await response.json();
 
-  // 検索クリア
-  const handleSearchClear = () => {
-    setRecordsSearchQuery("");
-    fetchAllRecords(1, "");
-  };
+      if (data.success) {
+        const imageData = data.cardImageUrl ||
+          (data.cardImageBase64 ? `data:image/png;base64,${data.cardImageBase64}` : null);
 
-  // 詳細モーダルを開く
-  const openDetailModal = (record: DiagnosisRecord) => {
-    setSelectedRecord(record);
-    setShowDetailModal(true);
-  };
+        if (imageData) {
+          setCardImageCache(prev => ({ ...prev, [userName]: imageData }));
+          return imageData;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Card image fetch error:", error);
+      return null;
+    }
+  }, [cardImageCache]);
 
-  // 画像プレビューを開く
-  const openImagePreview = (imageUrl: string, userName: string) => {
-    setPreviewImage(imageUrl);
-    setPreviewUserName(userName);
-  };
+  // モーダルを開く時に画像を取得
+  const openCardModal = async (diagnosis: RecentDiagnosis) => {
+    setSelectedCard(diagnosis);
 
-  // 画像をダウンロード
-  const handleDownloadImage = (imageData: string, userName: string) => {
-    const fileName = `card_${userName}_${Date.now()}.png`;
-    if (imageData.startsWith("data:")) {
-      downloadBase64Image(imageData, fileName);
-    } else {
-      downloadImage(imageData, fileName);
+    // すでに画像URLがある場合はそのまま使用
+    if (diagnosis.card_image_url || diagnosis.card_image_base64) {
+      return;
+    }
+
+    // 画像フラグがあり、キャッシュにない場合は取得
+    if (diagnosis.has_card_image && !cardImageCache[diagnosis.user_name]) {
+      setCardImageLoading(true);
+      await fetchCardImage(diagnosis.user_name);
+      setCardImageLoading(false);
     }
   };
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-3xl border border-purple-500/20 shadow-2xl shadow-purple-500/10 max-w-md w-full mx-4"
+          className="bg-black/50 backdrop-blur-xl p-8 rounded-2xl border border-purple-500/30 max-w-md w-full mx-4"
         >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🔐</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white">管理者ログイン</h1>
-            <p className="text-slate-400 text-sm mt-2">夢タイプ診断ガチャ</p>
-          </div>
-
+          <h1 className="text-2xl font-bold text-center mb-6 text-purple-300">
+            🔐 管理者ログイン
+          </h1>
+          
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
@@ -464,9 +315,9 @@ export default function AdminPage() {
                 setPasswordError(false);
               }}
               placeholder="管理者パスワード"
-              className={`w-full p-4 rounded-xl bg-slate-800/50 border-2 ${
-                passwordError ? "border-red-500" : "border-slate-700"
-              } text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-colors`}
+              className={`w-full p-4 rounded-xl bg-black/30 border-2 ${
+                passwordError ? "border-red-500" : "border-purple-500/30"
+              } text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-500`}
               autoFocus
             />
             {passwordError && (
@@ -474,7 +325,7 @@ export default function AdminPage() {
             )}
             <button
               type="submit"
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-white font-bold transition-all shadow-lg shadow-purple-500/25"
+              className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-bold transition-colors"
             >
               ログイン
             </button>
@@ -485,60 +336,52 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900/50 to-slate-900">
-      {/* ヘッダー */}
-      <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-xl border-b border-slate-700/50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <span className="text-xl">⚙️</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">管理者ダッシュボード</h1>
-                <p className="text-slate-400 text-xs">夢タイプ診断ガチャ - クレーム対応完全版</p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-center">
-              <label className="flex items-center gap-2 text-slate-300 text-sm bg-slate-800/50 px-3 py-2 rounded-lg">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded accent-purple-500"
-                />
-                自動更新
-              </label>
-              <button
-                onClick={fetchStats}
-                disabled={loading}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white text-sm transition-colors flex items-center gap-2"
-              >
-                <span className={loading ? "animate-spin" : ""}>🔄</span>
-                更新
-              </button>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* ヘッダー */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-purple-300">
+              ⚙️ 管理者ダッシュボード
+            </h1>
+            <p className="text-purple-400/60 text-sm">夢タイプ診断ガチャ</p>
+          </div>
+          <div className="flex gap-2 items-center">
+            <label className="flex items-center gap-2 text-purple-300 text-sm">
+              <input
+                type="checkbox"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="rounded"
+              />
+              自動更新
+            </label>
+            <button
+              onClick={fetchStats}
+              disabled={loading}
+              className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600 rounded-lg text-white text-sm transition-colors"
+            >
+              {loading ? "⏳" : "🔄"} 更新
+            </button>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
         {/* タブ */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-6 flex-wrap">
           {[
             { id: "dashboard", label: "📊 ダッシュボード" },
-            { id: "records", label: "👤 診断記録・検索" },
-            { id: "logs", label: "🎴 カード生成ログ" },
-            { id: "errors", label: "⚠️ エラーログ" },
+            { id: "support", label: `📨 問い合わせ${stats?.supportStats?.open ? ` (${stats.supportStats.open})` : ""}` },
+            { id: "users", label: "👤 ユーザー管理" },
             { id: "data", label: "🗑️ データ管理" },
+            { id: "logs", label: "📋 全診断一覧" },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`px-5 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/25"
-                  : "bg-slate-800/50 text-slate-300 hover:bg-slate-700/50"
+                  ? "bg-purple-600 text-white"
+                  : "bg-purple-900/30 text-purple-300 hover:bg-purple-900/50"
               }`}
             >
               {tab.label}
@@ -550,30 +393,30 @@ export default function AdminPage() {
         {activeTab === "dashboard" && stats && (
           <div className="space-y-6">
             {/* 概要カード */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 title="総診断数"
                 value={stats.totalDiagnoses}
                 icon="📊"
-                gradient="from-purple-500 to-indigo-600"
+                color="purple"
               />
               <StatCard
                 title="今日の診断"
                 value={stats.todayDiagnoses}
                 icon="📅"
-                gradient="from-blue-500 to-cyan-600"
+                color="blue"
               />
               <StatCard
                 title="待機中"
                 value={stats.queueStatus.waiting}
                 icon="⏳"
-                gradient="from-amber-500 to-orange-600"
+                color="yellow"
               />
               <StatCard
                 title="処理中"
                 value={stats.queueStatus.processing}
                 icon="⚡"
-                gradient="from-emerald-500 to-teal-600"
+                color="green"
               />
             </div>
 
@@ -581,114 +424,60 @@ export default function AdminPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+              className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
             >
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-sm">🎴</span>
-                カード生成統計
+              <h3 className="text-lg font-bold text-purple-300 mb-4">
+                🎴 カード生成統計
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="bg-slate-900/50 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm mb-1">総生成数</p>
-                  <p className="text-3xl font-bold text-white">{stats.generationStats.total}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-purple-400 text-sm mb-1">総生成数</p>
+                  <p className="text-2xl font-bold text-white">
+                    {stats.generationStats.total}
+                  </p>
                 </div>
-                <div className="bg-slate-900/50 rounded-xl p-4">
-                  <p className="text-emerald-400 text-sm mb-1">成功</p>
-                  <p className="text-3xl font-bold text-emerald-400">{stats.generationStats.successful}</p>
+                <div>
+                  <p className="text-green-400 text-sm mb-1">成功</p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {stats.generationStats.successful}
+                  </p>
                 </div>
-                <div className="bg-slate-900/50 rounded-xl p-4">
+                <div>
                   <p className="text-red-400 text-sm mb-1">失敗</p>
-                  <p className="text-3xl font-bold text-red-400">{stats.generationStats.failed}</p>
+                  <p className="text-2xl font-bold text-red-400">
+                    {stats.generationStats.failed}
+                  </p>
                 </div>
-                <div className="bg-slate-900/50 rounded-xl p-4">
-                  <p className="text-slate-400 text-sm mb-1">成功率</p>
-                  <p className={`text-3xl font-bold ${
-                    stats.generationStats.successRate >= 90 ? "text-emerald-400" :
-                    stats.generationStats.successRate >= 70 ? "text-amber-400" : "text-red-400"
+                <div>
+                  <p className="text-purple-400 text-sm mb-1">成功率</p>
+                  <p className={`text-2xl font-bold ${
+                    stats.generationStats.successRate >= 90
+                      ? "text-green-400"
+                      : stats.generationStats.successRate >= 70
+                      ? "text-yellow-400"
+                      : "text-red-400"
                   }`}>
                     {stats.generationStats.successRate}%
                   </p>
                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-slate-700/50">
-                <p className="text-slate-400 text-sm">
-                  過去1時間: <span className="font-bold text-white">{stats.generationStats.recentHour}</span> 件
+              <div className="mt-4 pt-4 border-t border-purple-500/30">
+                <p className="text-purple-300 text-sm">
+                  過去1時間の生成数: <span className="font-bold text-white">{stats.generationStats.recentHour}</span> 件
                 </p>
               </div>
             </motion.div>
-
-            {/* 日別アクセス推移 */}
-            {stats.dailyDistribution && stats.dailyDistribution.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
-              >
-                <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                  <span className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center text-sm">📈</span>
-                  日別アクセス推移（過去7日）
-                </h3>
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="flex items-center gap-2 text-sm">
-                    <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
-                    <span className="text-slate-300">PV（総アクセス）</span>
-                  </span>
-                  <span className="flex items-center gap-2 text-sm">
-                    <span className="w-3 h-3 bg-emerald-500 rounded-full"></span>
-                    <span className="text-slate-300">UPV（ユニーク）</span>
-                  </span>
-                </div>
-                <div className="grid grid-cols-7 gap-2">
-                  {stats.dailyDistribution.map((day, i) => {
-                    const maxPV = Math.max(...stats.dailyDistribution.map(d => d.pv), 1);
-                    const pvHeight = (day.pv / maxPV) * 100;
-                    const upvHeight = (day.upv / maxPV) * 100;
-                    const date = new Date(day.date);
-                    const dayName = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
-                    return (
-                      <div key={i} className="flex flex-col items-center">
-                        <div className="relative h-32 w-full flex items-end justify-center gap-1 mb-2">
-                          <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: `${pvHeight}%` }}
-                            transition={{ duration: 0.5, delay: i * 0.05 }}
-                            className="w-5 bg-gradient-to-t from-purple-600 to-purple-400 rounded-t"
-                            title={`PV: ${day.pv}`}
-                          />
-                          <motion.div
-                            initial={{ height: 0 }}
-                            animate={{ height: `${upvHeight}%` }}
-                            transition={{ duration: 0.5, delay: i * 0.05 + 0.1 }}
-                            className="w-5 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t"
-                            title={`UPV: ${day.upv}`}
-                          />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-slate-400 text-xs">{date.getMonth() + 1}/{date.getDate()}</p>
-                          <p className="text-slate-500 text-[10px]">({dayName})</p>
-                        </div>
-                        <div className="text-center mt-1">
-                          <p className="text-purple-400 text-xs font-bold">{day.pv}</p>
-                          <p className="text-emerald-400 text-[10px]">{day.upv}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
 
             {/* タイプ分布グラフ */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+              className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
             >
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center text-sm">🎯</span>
-                タイプ分布
+              <h3 className="text-lg font-bold text-purple-300 mb-4">
+                🎯 タイプ分布
               </h3>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {Object.entries(stats.typeDistribution)
                   .sort(([, a], [, b]) => b - a)
                   .map(([type, count]) => {
@@ -696,87 +485,64 @@ export default function AdminPage() {
                       ? (count / stats.totalDiagnoses) * 100
                       : 0;
                     return (
-                      <div key={type} className="flex items-center gap-4">
-                        <div className="w-28 text-sm text-white font-medium">
+                      <div key={type} className="flex items-center gap-3">
+                        <div className="w-24 text-sm text-purple-200">
                           {TYPE_NAMES[type] || type}
                         </div>
-                        <div className="flex-1 bg-slate-900/50 rounded-full h-8 overflow-hidden">
+                        <div className="flex-1 bg-purple-900/30 rounded-full h-6 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${percentage}%` }}
                             transition={{ duration: 0.5 }}
-                            className="h-full rounded-full flex items-center justify-end pr-3"
-                            style={{
-                              background: `linear-gradient(90deg, ${TYPE_COLORS[type] || "#9370db"}88, ${TYPE_COLORS[type] || "#9370db"})`
-                            }}
-                          >
-                            {percentage > 15 && (
-                              <span className="text-white text-xs font-bold">{count}</span>
-                            )}
-                          </motion.div>
+                            className="h-full rounded-full"
+                            style={{ backgroundColor: TYPE_COLORS[type] || "#9370db" }}
+                          />
                         </div>
-                        <div className="w-20 text-right">
-                          <span className="text-white font-bold">{percentage.toFixed(1)}%</span>
+                        <div className="w-16 text-right text-sm text-purple-300">
+                          {count}人 ({percentage.toFixed(1)}%)
                         </div>
                       </div>
                     );
                   })}
                 {Object.keys(stats.typeDistribution).length === 0 && (
-                  <p className="text-slate-500 text-center py-8">まだデータがありません</p>
+                  <p className="text-purple-400/60 text-center py-4">
+                    まだデータがありません
+                  </p>
                 )}
               </div>
             </motion.div>
 
-            {/* 時間帯別アクセス */}
+            {/* 時間帯別グラフ */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+              transition={{ delay: 0.1 }}
+              className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
             >
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-pink-500 to-rose-500 rounded-lg flex items-center justify-center text-sm">⏰</span>
-                時間帯別アクセス（過去7日）
+              <h3 className="text-lg font-bold text-purple-300 mb-4">
+                ⏰ 時間帯別アクセス（過去7日）
               </h3>
-              <div className="flex items-center gap-4 mb-4">
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
-                  <span className="text-slate-300">PV</span>
-                </span>
-                <span className="flex items-center gap-2 text-sm">
-                  <span className="w-3 h-3 bg-emerald-500 rounded-full"></span>
-                  <span className="text-slate-300">UPV</span>
-                </span>
-              </div>
-              <div className="flex items-end gap-[2px] h-40">
+              <div className="flex items-end gap-1 h-32">
                 {stats.hourlyDistribution.map((count, hour) => {
                   const maxCount = Math.max(...stats.hourlyDistribution, 1);
-                  const pvHeight = (count / maxCount) * 100;
-                  const upvHeight = stats.hourlyUniqueDistribution
-                    ? (stats.hourlyUniqueDistribution[hour] / maxCount) * 100
-                    : 0;
+                  const height = (count / maxCount) * 100;
                   return (
-                    <div key={hour} className="flex-1 flex flex-col items-center group relative">
-                      <div className="flex items-end gap-[1px] h-32 w-full justify-center">
-                        <motion.div
-                          initial={{ height: 0 }}
-                          animate={{ height: `${pvHeight}%` }}
-                          transition={{ duration: 0.5, delay: hour * 0.02 }}
-                          className="w-1/2 bg-gradient-to-t from-purple-600 to-purple-400 rounded-t"
-                        />
-                        <motion.div
-                          initial={{ height: 0 }}
-                          animate={{ height: `${upvHeight}%` }}
-                          transition={{ duration: 0.5, delay: hour * 0.02 + 0.1 }}
-                          className="w-1/2 bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t"
-                        />
-                      </div>
+                    <div
+                      key={hour}
+                      className="flex-1 flex flex-col items-center"
+                    >
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: `${height}%` }}
+                        transition={{ duration: 0.5, delay: hour * 0.02 }}
+                        className="w-full bg-gradient-to-t from-purple-600 to-pink-500 rounded-t"
+                        title={`${hour}時: ${count}件`}
+                      />
                       {hour % 3 === 0 && (
-                        <span className="text-[10px] text-slate-500 mt-1">{hour}</span>
+                        <span className="text-[10px] text-purple-400 mt-1">
+                          {hour}
+                        </span>
                       )}
-                      {/* ツールチップ */}
-                      <div className="absolute bottom-full mb-2 hidden group-hover:block bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                        {hour}時: PV {count}, UPV {stats.hourlyUniqueDistribution?.[hour] || 0}
-                      </div>
                     </div>
                   );
                 })}
@@ -790,28 +556,27 @@ export default function AdminPage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
           >
-            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-              <span className="w-8 h-8 bg-gradient-to-br from-red-500 to-orange-500 rounded-lg flex items-center justify-center text-sm">🗑️</span>
-              データ管理
+            <h3 className="text-lg font-bold text-purple-300 mb-4">
+              🗑️ データ管理
             </h3>
-            <div className="space-y-4 max-w-md">
+            <div className="space-y-4">
               <button
                 onClick={clearAllLocalData}
-                className="w-full py-4 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 rounded-xl text-amber-300 font-bold transition-colors"
+                className="w-full py-4 bg-yellow-600/30 hover:bg-yellow-600/50 border border-yellow-500/50 rounded-xl text-yellow-300 font-bold transition-colors"
               >
                 🔄 ローカルデータをクリア
               </button>
               <button
                 onClick={clearSupabaseRecords}
-                className="w-full py-4 bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/50 rounded-xl text-orange-300 font-bold transition-colors"
+                className="w-full py-4 bg-orange-600/30 hover:bg-orange-600/50 border border-orange-500/50 rounded-xl text-orange-300 font-bold transition-colors"
               >
                 🌐 Supabase全記録をクリア
               </button>
               <button
                 onClick={fullReset}
-                className="w-full py-4 bg-gradient-to-r from-red-600/30 to-pink-600/30 hover:from-red-600/50 hover:to-pink-600/50 border border-red-500/50 rounded-xl text-white font-bold transition-colors"
+                className="w-full py-4 bg-gradient-to-r from-red-600/50 to-pink-600/50 hover:from-red-600/70 hover:to-pink-600/70 border border-red-500/50 rounded-xl text-white font-bold transition-colors"
               >
                 ⚡ 完全リセット（ローカル + サーバー）
               </button>
@@ -821,643 +586,577 @@ export default function AdminPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50"
+                className="mt-6 p-4 bg-black/30 rounded-xl border border-purple-500/30"
               >
-                <pre className="text-slate-200 text-sm whitespace-pre-wrap">{clearStatus}</pre>
+                <pre className="text-purple-200 text-sm whitespace-pre-wrap">
+                  {clearStatus}
+                </pre>
               </motion.div>
             )}
           </motion.div>
         )}
 
-        {/* 診断記録・検索タブ */}
-        {activeTab === "records" && (
+        {/* 全ユーザー診断タブ */}
+        {activeTab === "logs" && stats && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30 flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 250px)' }}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-sm">👤</span>
-                診断記録・ユーザー検索
-                {allRecords && (
-                  <span className="ml-2 px-3 py-1 bg-purple-600/30 rounded-full text-purple-300 text-sm">
-                    {allRecords.total}件
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={() => fetchAllRecords(1, recordsSearchQuery)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
-              >
-                🔄 更新
-              </button>
-            </div>
+            <h3 className="text-lg font-bold text-purple-300 mb-4 flex-shrink-0">
+              📋 全ユーザー診断一覧（{stats.recentDiagnoses.length}件）
+            </h3>
+            <div className="space-y-4 flex-1 overflow-y-auto pr-2 pb-6" style={{ minHeight: 0 }}>
+              {stats.recentDiagnoses.map((diagnosis, i) => (
+                <motion.div
+                  key={diagnosis.id || i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.5) }}
+                  className="flex flex-col md:flex-row gap-4 p-4 bg-purple-900/20 rounded-lg min-w-0"
+                >
+                  {/* カード画像サムネイル */}
+                  <div className="flex-shrink-0">
+                    <CardThumbnail
+                      diagnosis={diagnosis}
+                      cardImageCache={cardImageCache}
+                      onLoadImage={fetchCardImage}
+                      onOpenModal={openCardModal}
+                    />
+                  </div>
 
-            {/* 検索フォーム - 強調表示 */}
-            <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-xl p-4 mb-6 border border-purple-500/30">
-              <p className="text-purple-200 text-sm mb-3">
-                💡 <strong>クレーム対応用:</strong> ユーザーのニックネームを入力して検索
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={recordsSearchQuery}
-                  onChange={(e) => setRecordsSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  placeholder="ニックネームを入力..."
-                  className="flex-1 p-3 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 text-lg"
-                  autoFocus
-                />
-                <button
-                  onClick={handleSearch}
-                  disabled={recordsLoading}
-                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl text-white font-bold transition-colors disabled:opacity-50"
-                >
-                  {recordsLoading ? "⏳ 検索中..." : "🔍 検索"}
-                </button>
-                <button
-                  onClick={handleSearchClear}
-                  className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl text-white transition-colors"
-                >
-                  クリア
-                </button>
-              </div>
+                  {/* ユーザー情報 */}
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">
+                        {TYPE_NAMES[diagnosis.dream_type]?.split(" ")[0] || "❓"}
+                      </span>
+                      <div>
+                        <p className="text-purple-200 font-medium">
+                          {diagnosis.user_name}
+                        </p>
+                        <p className="text-purple-400/60 text-xs">
+                          {TYPE_NAMES[diagnosis.dream_type] || diagnosis.dream_type}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 詳細情報 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs break-words">
+                      <div className="text-purple-400">
+                        📅 {new Date(diagnosis.created_at).toLocaleString("ja-JP")}
+                      </div>
+                      {diagnosis.ip_address && (
+                        <div className="text-purple-400">
+                          🌐 IP: {diagnosis.ip_address}
+                        </div>
+                      )}
+                      {diagnosis.fingerprint && (
+                        <div className="text-purple-400/60 truncate">
+                          🔑 FP: {diagnosis.fingerprint.substring(0, 16)}...
+                        </div>
+                      )}
+                      {diagnosis.user_agent && (
+                        <div className="text-purple-400/40 truncate col-span-2">
+                          📱 {diagnosis.user_agent.substring(0, 50)}...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* アクション */}
+                  <div className="flex-shrink-0 flex items-center gap-2 flex-wrap md:flex-nowrap">
+                    {(diagnosis.card_image_url || diagnosis.card_image_base64 || diagnosis.has_card_image) && (
+                      <button
+                        onClick={() => openCardModal(diagnosis)}
+                        className="px-3 py-2 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 rounded-lg text-purple-300 text-xs transition-colors whitespace-nowrap"
+                      >
+                        🔍 拡大
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteUser(diagnosis.user_name)}
+                      className="px-3 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-xs transition-colors whitespace-nowrap"
+                    >
+                      🗑️ 削除
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+              {stats.recentDiagnoses.length === 0 && (
+                <p className="text-purple-400/60 text-center py-8">
+                  まだ診断記録がありません
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ユーザー管理タブ */}
+        {activeTab === "users" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30"
+          >
+            <h3 className="text-lg font-bold text-purple-300 mb-4">
+              👤 ユーザー検索・削除
+            </h3>
+            
+            {/* 検索フォーム */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchUsers()}
+                placeholder="ユーザー名を入力（部分一致）"
+                className="flex-1 p-3 rounded-lg bg-black/30 border border-purple-500/30 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={searchUsers}
+                disabled={searchLoading}
+                className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-bold transition-colors disabled:opacity-50"
+              >
+                {searchLoading ? "🔍..." : "🔍 検索"}
+              </button>
             </div>
 
             {/* ステータス表示 */}
             {deleteStatus && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-emerald-900/30 rounded-xl border border-emerald-500/30"
-              >
-                <p className="text-emerald-200 text-sm">{deleteStatus}</p>
-              </motion.div>
+              <div className="mb-4 p-3 bg-black/30 rounded-lg border border-purple-500/30">
+                <p className="text-purple-200 text-sm">{deleteStatus}</p>
+              </div>
             )}
 
-            {/* 記録一覧 */}
-            {recordsLoading ? (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">検索中...</p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  {allRecords?.records.map((record) => {
-                    const hasImage = record.card_image_url || record.card_image_base64;
-                    const imageData = record.card_image_url || record.card_image_base64;
-
-                    return (
-                      <motion.div
-                        key={record.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 hover:border-purple-500/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-4">
-                          {/* サムネイル or タイプアイコン */}
-                          {hasImage && imageData ? (
-                            <div
-                              className="w-16 h-20 rounded-xl overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800 relative"
-                              onClick={() => openImagePreview(imageData, record.user_name)}
-                            >
-                              <Image
-                                src={imageData}
-                                alt="カードサムネイル"
-                                fill
-                                className="object-cover"
-                                unoptimized={imageData.startsWith("data:")}
-                              />
-                              <div className="absolute inset-0 bg-black/0 hover:bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                <span className="text-white text-xs">🔍</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              className="w-14 h-14 rounded-xl flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all"
-                              style={{ backgroundColor: TYPE_COLORS[record.dream_type] + "30" }}
-                              onClick={() => openDetailModal(record)}
-                            >
-                              <span className="text-2xl">
-                                {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-white font-bold text-lg">{record.user_name}</p>
-                            <p className="text-slate-400 text-sm">
-                              {TYPE_NAMES[record.dream_type] || record.dream_type}
-                            </p>
-                            <p className="text-slate-500 text-xs">
-                              {new Date(record.created_at).toLocaleString("ja-JP")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 flex-wrap justify-end">
-                          {hasImage && imageData && (
-                            <button
-                              onClick={() => handleDownloadImage(imageData, record.user_name)}
-                              className="px-4 py-2 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 rounded-lg text-emerald-300 text-sm transition-colors flex items-center gap-1"
-                            >
-                              💾 ダウンロード
-                            </button>
-                          )}
-                          <button
-                            onClick={() => openDetailModal(record)}
-                            className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/50 rounded-lg text-blue-300 text-sm transition-colors"
-                          >
-                            📋 詳細
-                          </button>
-                          <button
-                            onClick={() => deleteUser(record.user_name)}
-                            className="px-3 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm transition-colors"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                  {allRecords?.records.length === 0 && (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-slate-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-3xl">🔍</span>
-                      </div>
-                      <p className="text-slate-400">
-                        {recordsSearchQuery ? `「${recordsSearchQuery}」に一致する記録がありません` : "診断記録がありません"}
+            {/* 検索結果 */}
+            <div className="space-y-2">
+              {searchResults.map((record) => (
+                <div
+                  key={record.id}
+                  className="flex items-center justify-between p-3 bg-purple-900/20 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {TYPE_NAMES[record.dream_type]?.split(" ")[0] || "❓"}
+                    </span>
+                    <div>
+                      <p className="text-purple-200 font-medium">
+                        {record.user_name}
+                      </p>
+                      <p className="text-purple-400/60 text-xs">
+                        {TYPE_NAMES[record.dream_type] || record.dream_type} ・{" "}
+                        {new Date(record.created_at).toLocaleString("ja-JP")}
                       </p>
                     </div>
-                  )}
-                </div>
-
-                {/* ページネーション */}
-                {allRecords && allRecords.totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-4">
-                    <button
-                      onClick={() => fetchAllRecords(recordsPage - 1, recordsSearchQuery)}
-                      disabled={recordsPage <= 1}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      ← 前
-                    </button>
-                    <span className="text-slate-300">
-                      {recordsPage} / {allRecords.totalPages}
-                    </span>
-                    <button
-                      onClick={() => fetchAllRecords(recordsPage + 1, recordsSearchQuery)}
-                      disabled={recordsPage >= allRecords.totalPages}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      次 →
-                    </button>
                   </div>
-                )}
-              </>
-            )}
+                  <button
+                    onClick={() => deleteUser(record.user_name)}
+                    className="px-4 py-2 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-lg text-red-300 text-sm font-bold transition-colors"
+                  >
+                    🗑️ 削除
+                  </button>
+                </div>
+              ))}
+              {searchResults.length === 0 && searchQuery && !searchLoading && (
+                <p className="text-purple-400/60 text-center py-8">
+                  検索結果がありません
+                </p>
+              )}
+              {!searchQuery && (
+                <p className="text-purple-400/60 text-center py-8">
+                  ユーザー名を入力して検索してください
+                </p>
+              )}
+            </div>
           </motion.div>
         )}
 
-        {/* カード生成ログタブ */}
-        {activeTab === "logs" && (
+        {/* サポート問い合わせタブ */}
+        {activeTab === "support" && stats && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
+            className="space-y-6"
           >
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-sm">🎴</span>
-                カード生成ログ
-                {generationLogs && (
-                  <span className="ml-2 px-3 py-1 bg-purple-600/30 rounded-full text-purple-300 text-sm">
-                    {generationLogs.total}件
-                  </span>
-                )}
+            {/* 問い合わせ統計 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatCard
+                title="総問い合わせ"
+                value={stats.supportStats?.total || 0}
+                icon="📨"
+                color="purple"
+              />
+              <StatCard
+                title="未対応"
+                value={stats.supportStats?.open || 0}
+                icon="🔴"
+                color="yellow"
+              />
+              <StatCard
+                title="対応中"
+                value={stats.supportStats?.inProgress || 0}
+                icon="🟡"
+                color="blue"
+              />
+              <StatCard
+                title="解決済み"
+                value={stats.supportStats?.resolved || 0}
+                icon="🟢"
+                color="green"
+              />
+            </div>
+
+            {/* 問い合わせ一覧 */}
+            <div className="bg-black/30 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30">
+              <h3 className="text-lg font-bold text-purple-300 mb-4">
+                📋 問い合わせ一覧
               </h3>
-              <div className="flex gap-2">
-                <select
-                  value={logsFilter}
-                  onChange={(e) => {
-                    setLogsFilter(e.target.value as typeof logsFilter);
-                    fetchGenerationLogs(1, e.target.value as typeof logsFilter);
-                  }}
-                  className="px-3 py-2 bg-slate-700 rounded-lg text-white text-sm"
-                >
-                  <option value="all">すべて</option>
-                  <option value="success">成功のみ</option>
-                  <option value="failed">失敗のみ</option>
-                </select>
+              <div className="space-y-4">
+                {stats.supportInquiries && stats.supportInquiries.length > 0 ? (
+                  stats.supportInquiries.map((inquiry) => (
+                    <motion.div
+                      key={inquiry.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                        inquiry.status === "open"
+                          ? "bg-red-900/20 border-red-500/30 hover:bg-red-900/30"
+                          : inquiry.status === "in_progress"
+                          ? "bg-yellow-900/20 border-yellow-500/30 hover:bg-yellow-900/30"
+                          : "bg-green-900/20 border-green-500/30 hover:bg-green-900/30"
+                      }`}
+                      onClick={() => setSelectedInquiry(inquiry)}
+                    >
+                      <div className="flex flex-col md:flex-row justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              inquiry.status === "open"
+                                ? "bg-red-500/30 text-red-300"
+                                : inquiry.status === "in_progress"
+                                ? "bg-yellow-500/30 text-yellow-300"
+                                : "bg-green-500/30 text-green-300"
+                            }`}>
+                              {inquiry.status === "open" ? "未対応" : inquiry.status === "in_progress" ? "対応中" : "解決済み"}
+                            </span>
+                            <span className="text-purple-300 font-medium">
+                              {inquiry.user_name || "名前不明"}
+                            </span>
+                            {inquiry.dream_type && (
+                              <span className="text-purple-400/60 text-sm">
+                                ({TYPE_NAMES[inquiry.dream_type] || inquiry.dream_type})
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-purple-200 text-sm line-clamp-2">
+                            {inquiry.issue_summary}
+                          </p>
+                          <p className="text-purple-400/60 text-xs mt-1">
+                            {new Date(inquiry.created_at).toLocaleString("ja-JP")}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedInquiry(inquiry);
+                            }}
+                            className="px-3 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/50 rounded-lg text-purple-300 text-xs transition-colors"
+                          >
+                            詳細
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <p className="text-purple-400/60 text-center py-8">
+                    問い合わせはまだありません
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* 問い合わせ詳細モーダル */}
+        {selectedInquiry && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setSelectedInquiry(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 rounded-2xl border border-purple-500/30 p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* ヘッダー */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xl font-bold text-purple-300 mb-1">
+                    問い合わせ詳細
+                  </h3>
+                  <p className="text-purple-400/60 text-sm">
+                    {new Date(selectedInquiry.created_at).toLocaleString("ja-JP")}
+                  </p>
+                </div>
                 <button
-                  onClick={() => fetchGenerationLogs(logsPage, logsFilter)}
-                  disabled={logsLoading}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
+                  onClick={() => setSelectedInquiry(null)}
+                  className="w-8 h-8 bg-purple-600/50 hover:bg-purple-600 rounded-full text-white flex items-center justify-center transition-colors"
                 >
-                  🔄 更新
+                  ✕
                 </button>
               </div>
-            </div>
 
-            {logsLoading ? (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">読み込み中...</p>
+              {/* ユーザー情報 */}
+              <div className="mb-4 p-4 bg-purple-900/30 rounded-lg">
+                <h4 className="text-purple-300 font-bold mb-2">ユーザー情報</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <p className="text-purple-400">
+                    名前: <span className="text-purple-200">{selectedInquiry.user_name || "不明"}</span>
+                  </p>
+                  <p className="text-purple-400">
+                    タイプ: <span className="text-purple-200">{selectedInquiry.dream_type ? TYPE_NAMES[selectedInquiry.dream_type] || selectedInquiry.dream_type : "不明"}</span>
+                  </p>
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  {generationLogs?.logs.map((log) => {
-                    const hasImage = log.card_image_url || log.card_image_base64;
-                    const imageData = log.card_image_url || log.card_image_base64;
 
-                    return (
+              {/* 問い合わせ内容 */}
+              <div className="mb-4 p-4 bg-purple-900/30 rounded-lg">
+                <h4 className="text-purple-300 font-bold mb-2">問い合わせ内容</h4>
+                <p className="text-purple-200 whitespace-pre-wrap">
+                  {selectedInquiry.issue_summary}
+                </p>
+              </div>
+
+              {/* 会話履歴 */}
+              {selectedInquiry.conversation && selectedInquiry.conversation.length > 0 && (
+                <div className="mb-4 p-4 bg-purple-900/30 rounded-lg">
+                  <h4 className="text-purple-300 font-bold mb-2">
+                    チャット履歴 ({selectedInquiry.conversation.length}件)
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedInquiry.conversation.map((msg, idx) => (
                       <div
-                        key={log.id}
-                        className={`p-4 rounded-xl border ${
-                          log.success
-                            ? "bg-emerald-900/20 border-emerald-500/30"
-                            : "bg-red-900/20 border-red-500/30"
+                        key={idx}
+                        className={`p-2 rounded-lg text-sm ${
+                          msg.role === "user"
+                            ? "bg-blue-900/30 text-blue-200 ml-8"
+                            : "bg-gray-900/30 text-gray-200 mr-8"
                         }`}
                       >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-4">
-                            {hasImage && imageData ? (
-                              <div
-                                className="w-12 h-16 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all bg-slate-800 relative"
-                                onClick={() => openImagePreview(imageData, log.user_name)}
-                              >
-                                <Image
-                                  src={imageData}
-                                  alt="カード"
-                                  fill
-                                  className="object-cover"
-                                  unoptimized={imageData.startsWith("data:")}
-                                />
-                              </div>
-                            ) : (
-                              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                                log.success ? "bg-emerald-600/30" : "bg-red-600/30"
-                              }`}>
-                                <span className="text-xl">{log.success ? "✅" : "❌"}</span>
-                              </div>
-                            )}
-                            <div>
-                              <p className={`font-medium ${log.success ? "text-emerald-200" : "text-red-200"}`}>
-                                {log.success ? "✓ 成功" : "✗ 失敗"} - {log.user_name || "不明"}
-                              </p>
-                              <p className="text-slate-400 text-xs">
-                                {TYPE_NAMES[log.dream_type] || log.dream_type} ・{" "}
-                                {new Date(log.created_at).toLocaleString("ja-JP")}
-                              </p>
-                              {log.generation_time_ms && (
-                                <p className="text-slate-500 text-xs">
-                                  生成時間: {(log.generation_time_ms / 1000).toFixed(1)}秒
-                                  {log.method && ` (${log.method})`}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          {hasImage && imageData && (
-                            <button
-                              onClick={() => handleDownloadImage(imageData, log.user_name)}
-                              className="px-3 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/50 rounded-lg text-emerald-300 text-xs transition-colors"
-                            >
-                              💾
-                            </button>
-                          )}
-                        </div>
-                        {log.error_message && (
-                          <p className="text-red-300 text-sm bg-slate-900/50 p-3 rounded-lg font-mono mt-3">
-                            {log.error_message}
-                          </p>
-                        )}
+                        <span className="text-xs text-purple-400">
+                          {msg.role === "user" ? "ユーザー" : "RASくん"}:
+                        </span>
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
                       </div>
-                    );
-                  })}
-                  {generationLogs?.logs.length === 0 && (
-                    <div className="text-center py-12">
-                      <p className="text-slate-500">ログがありません</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ページネーション */}
-                {generationLogs && generationLogs.totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-4">
-                    <button
-                      onClick={() => fetchGenerationLogs(logsPage - 1, logsFilter)}
-                      disabled={logsPage <= 1}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      ← 前
-                    </button>
-                    <span className="text-slate-300">
-                      {logsPage} / {generationLogs.totalPages}
-                    </span>
-                    <button
-                      onClick={() => fetchGenerationLogs(logsPage + 1, logsFilter)}
-                      disabled={logsPage >= generationLogs.totalPages}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      次 →
-                    </button>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
-          </motion.div>
-        )}
+                </div>
+              )}
 
-        {/* エラーログタブ */}
-        {activeTab === "errors" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-6 border border-slate-700/50"
-          >
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <span className="w-8 h-8 bg-gradient-to-br from-red-500 to-rose-500 rounded-lg flex items-center justify-center text-sm">⚠️</span>
-                エラーログ
-                {errorLogs && (
-                  <span className="ml-2 px-3 py-1 bg-red-600/30 rounded-full text-red-300 text-sm">
-                    {errorLogs.total}件
-                  </span>
-                )}
-              </h3>
-              <button
-                onClick={() => fetchErrorLogs(errorsPage)}
-                disabled={errorsLoading}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
-              >
-                🔄 更新
-              </button>
-            </div>
-
-            {errorsLoading ? (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-slate-400">読み込み中...</p>
+              {/* ステータス更新 */}
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-purple-300 text-sm self-center">ステータス:</span>
+                {["open", "in_progress", "resolved"].map((status) => (
+                  <button
+                    key={status}
+                    disabled={inquiryStatusUpdating || selectedInquiry.status === status}
+                    onClick={async () => {
+                      setInquiryStatusUpdating(true);
+                      try {
+                        const response = await fetch("/api/admin/support-status", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            password: ADMIN_PASSWORD,
+                            inquiryId: selectedInquiry.id,
+                            status,
+                          }),
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                          setSelectedInquiry({ ...selectedInquiry, status: status as "open" | "in_progress" | "resolved" });
+                          fetchStats();
+                        }
+                      } catch (error) {
+                        console.error("ステータス更新エラー:", error);
+                      }
+                      setInquiryStatusUpdating(false);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+                      selectedInquiry.status === status
+                        ? status === "open"
+                          ? "bg-red-500 text-white"
+                          : status === "in_progress"
+                          ? "bg-yellow-500 text-black"
+                          : "bg-green-500 text-white"
+                        : "bg-purple-900/50 text-purple-300 hover:bg-purple-900"
+                    } disabled:opacity-50`}
+                  >
+                    {inquiryStatusUpdating ? "..." : status === "open" ? "未対応" : status === "in_progress" ? "対応中" : "解決済み"}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <>
-                <div className="space-y-3 mb-6">
-                  {errorLogs?.logs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="p-4 bg-red-900/20 rounded-xl border border-red-500/30"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <p className="text-red-200 font-medium">
-                            ❌ {log.user_name || "不明"}
-                          </p>
-                          <p className="text-red-400/60 text-xs">
-                            {TYPE_NAMES[log.dream_type] || log.dream_type} ・{" "}
-                            {new Date(log.created_at).toLocaleString("ja-JP")}
-                          </p>
-                        </div>
-                      </div>
-                      {log.error_message && (
-                        <p className="text-red-300 text-sm bg-slate-900/50 p-3 rounded-lg font-mono">
-                          {log.error_message}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {errorLogs?.logs.length === 0 && (
-                    <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-3xl">✅</span>
-                      </div>
-                      <p className="text-emerald-400 font-medium">エラーはありません</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ページネーション */}
-                {errorLogs && errorLogs.totalPages > 1 && (
-                  <div className="flex justify-center items-center gap-4">
-                    <button
-                      onClick={() => fetchErrorLogs(errorsPage - 1)}
-                      disabled={errorsPage <= 1}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      ← 前
-                    </button>
-                    <span className="text-slate-300">
-                      {errorsPage} / {errorLogs.totalPages}
-                    </span>
-                    <button
-                      onClick={() => fetchErrorLogs(errorsPage + 1)}
-                      disabled={errorsPage >= errorLogs.totalPages}
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      次 →
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </motion.div>
+            </motion.div>
+          </div>
         )}
 
         {/* フッター */}
-        <div className="mt-8 text-center">
+        <div className="mt-8 mb-24 text-center">
           <a
             href="/"
-            className="text-slate-400 hover:text-white underline transition-colors"
+            className="text-purple-400 hover:text-purple-300 underline"
           >
             ← トップページに戻る
           </a>
         </div>
       </div>
 
-      {/* 詳細モーダル */}
-      <AnimatePresence>
-        {showDetailModal && selectedRecord && (
+      {/* カード画像モーダル */}
+      {selectedCard && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setSelectedCard(null)}
+        >
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowDetailModal(false)}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-slate-900 rounded-2xl border border-slate-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-6">
-                  <h3 className="text-xl font-bold text-white">診断詳細</h3>
-                  <button
-                    onClick={() => setShowDetailModal(false)}
-                    className="text-slate-400 hover:text-white text-2xl"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  {/* カードプレビュー */}
-                  {(selectedRecord.card_image_url || selectedRecord.card_image_base64) && (
-                    <div className="rounded-xl overflow-hidden border border-slate-700">
-                      <Image
-                        src={selectedRecord.card_image_url || selectedRecord.card_image_base64 || ""}
-                        alt="生成カード"
-                        width={600}
-                        height={900}
-                        className="w-full h-auto"
-                        priority
-                        unoptimized={(selectedRecord.card_image_url || selectedRecord.card_image_base64 || "").startsWith("data:")}
-                      />
-                      <div className="flex gap-2 p-2 bg-slate-800">
-                        <button
-                          onClick={() => handleDownloadImage(
-                            selectedRecord.card_image_url || selectedRecord.card_image_base64 || "",
-                            selectedRecord.user_name
-                          )}
-                          className="flex-1 py-2 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 text-sm rounded-lg transition-colors"
-                        >
-                          💾 画像をダウンロード
-                        </button>
-                        <a
-                          href={selectedRecord.card_image_url || selectedRecord.card_image_base64 || ""}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 py-2 bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-sm text-center rounded-lg"
-                        >
-                          🔗 新しいタブで開く
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 画像がない場合の警告 */}
-                  {!selectedRecord.card_image_url && !selectedRecord.card_image_base64 && (
-                    <div className="p-4 bg-amber-900/30 rounded-xl border border-amber-500/30">
-                      <p className="text-amber-200 text-sm">
-                        ⚠️ このユーザーのカード画像が見つかりません。
-                        カード生成に失敗した可能性があります。
-                      </p>
-                    </div>
-                  )}
-
-                  {/* タイプ表示 */}
-                  <div
-                    className="p-6 rounded-xl flex items-center gap-4"
-                    style={{ backgroundColor: TYPE_COLORS[selectedRecord.dream_type] + "20" }}
-                  >
-                    <span className="text-5xl">
-                      {TYPE_NAMES[selectedRecord.dream_type]?.split(" ")[0] || "❓"}
-                    </span>
-                    <div>
-                      <p className="text-white text-2xl font-bold">
-                        {TYPE_NAMES[selectedRecord.dream_type] || selectedRecord.dream_type}
-                      </p>
-                      <p className="text-slate-400">診断タイプ</p>
-                    </div>
-                  </div>
-
-                  {/* 詳細情報 */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                      <p className="text-slate-400 text-sm mb-1">ユーザー名</p>
-                      <p className="text-white text-lg font-bold">{selectedRecord.user_name}</p>
-                    </div>
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                      <p className="text-slate-400 text-sm mb-1">診断日時</p>
-                      <p className="text-white">{new Date(selectedRecord.created_at).toLocaleString("ja-JP")}</p>
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-800/50 rounded-xl p-4">
-                    <p className="text-slate-400 text-sm mb-1">フィンガープリント</p>
-                    <p className="text-slate-300 text-xs font-mono break-all">{selectedRecord.fingerprint}</p>
-                  </div>
-
-                  {selectedRecord.ip_address && (
-                    <div className="bg-slate-800/50 rounded-xl p-4">
-                      <p className="text-slate-400 text-sm mb-1">IPアドレス</p>
-                      <p className="text-slate-300 text-sm font-mono">{selectedRecord.ip_address}</p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      deleteUser(selectedRecord.user_name);
-                      setShowDetailModal(false);
-                    }}
-                    className="w-full py-3 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 rounded-xl text-red-300 font-bold transition-colors"
-                  >
-                    🗑️ この記録を削除（再診断を許可）
-                  </button>
-                </div>
+            {cardImageLoading ? (
+              <div className="flex items-center justify-center h-64 bg-purple-900/30 rounded-xl border-2 border-purple-500/30">
+                <span className="text-purple-300 text-lg">🔄 読み込み中...</span>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 画像プレビューモーダル */}
-      <AnimatePresence>
-        {previewImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setPreviewImage(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="max-w-lg w-full"
-              onClick={(e) => e.stopPropagation()}
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={selectedCard.card_image_url ||
+                     (selectedCard.card_image_base64 ? `data:image/png;base64,${selectedCard.card_image_base64}` : null) ||
+                     cardImageCache[selectedCard.user_name]}
+                alt={`${selectedCard.user_name}のカード`}
+                className="w-full rounded-xl shadow-2xl border-2 border-purple-500/30"
+              />
+            )}
+            <div className="mt-4 text-center">
+              <p className="text-white font-bold text-xl">{selectedCard.user_name}</p>
+              <p className="text-purple-300">
+                {TYPE_NAMES[selectedCard.dream_type] || selectedCard.dream_type}
+              </p>
+              <p className="text-purple-400/60 text-sm mt-1">
+                {new Date(selectedCard.created_at).toLocaleString("ja-JP")}
+              </p>
+              {selectedCard.ip_address && (
+                <p className="text-purple-400/60 text-xs mt-1">
+                  IP: {selectedCard.ip_address}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setSelectedCard(null)}
+              className="absolute -top-3 -right-3 w-10 h-10 bg-purple-600 hover:bg-purple-500 rounded-full text-white font-bold text-xl flex items-center justify-center shadow-lg transition-colors"
             >
-              <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-700">
-                <div className="p-3 bg-slate-800 flex justify-between items-center">
-                  <p className="text-white font-medium">{previewUserName}さんのカード</p>
-                  <button
-                    onClick={() => setPreviewImage(null)}
-                    className="text-slate-400 hover:text-white text-xl"
-                  >
-                    ×
-                  </button>
-                </div>
-                <Image
-                  src={previewImage}
-                  alt="カードプレビュー"
-                  width={500}
-                  height={750}
-                  className="w-full h-auto"
-                  unoptimized={previewImage.startsWith("data:")}
-                />
-                <div className="p-3 bg-slate-800 flex gap-2">
-                  <button
-                    onClick={() => handleDownloadImage(previewImage, previewUserName)}
-                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg transition-colors"
-                  >
-                    💾 ダウンロード
-                  </button>
-                  <button
-                    onClick={() => setPreviewImage(null)}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+              ✕
+            </button>
+            {/* ダウンロードボタン */}
+            {(selectedCard.card_image_url || cardImageCache[selectedCard.user_name]) && (
+              <a
+                href={selectedCard.card_image_url || cardImageCache[selectedCard.user_name]}
+                download={`${selectedCard.user_name}-card.png`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute bottom-4 right-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-sm font-bold transition-colors"
+              >
+                📥 ダウンロード
+              </a>
+            )}
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
+  );
+}
+
+// サムネイルコンポーネント（Intersection Observer対応）
+function CardThumbnail({
+  diagnosis,
+  cardImageCache,
+  onLoadImage,
+  onOpenModal,
+}: {
+  diagnosis: RecentDiagnosis;
+  cardImageCache: Record<string, string>;
+  onLoadImage: (userName: string) => Promise<string | null>;
+  onOpenModal: (diagnosis: RecentDiagnosis) => void;
+}) {
+  const thumbnailRef = useRef<HTMLButtonElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasTriedLoad, setHasTriedLoad] = useState(false);
+
+  const imageUrl = diagnosis.card_image_url ||
+    (diagnosis.card_image_base64 ? `data:image/png;base64,${diagnosis.card_image_base64}` : null) ||
+    cardImageCache[diagnosis.user_name];
+
+  useEffect(() => {
+    if (imageUrl || hasTriedLoad || !diagnosis.has_card_image) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !hasTriedLoad) {
+          setHasTriedLoad(true);
+          setIsLoading(true);
+          await onLoadImage(diagnosis.user_name);
+          setIsLoading(false);
+        }
+      },
+      { rootMargin: '100px', threshold: 0.1 }
+    );
+
+    if (thumbnailRef.current) {
+      observer.observe(thumbnailRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [diagnosis.user_name, diagnosis.has_card_image, imageUrl, hasTriedLoad, onLoadImage]);
+
+  if (!diagnosis.card_image_url && !diagnosis.card_image_base64 && !diagnosis.has_card_image && !cardImageCache[diagnosis.user_name]) {
+    return (
+      <div className="w-20 h-28 bg-purple-900/30 rounded-lg flex items-center justify-center border border-purple-500/20">
+        <span className="text-purple-400/50 text-xs text-center">No<br />Image</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      ref={thumbnailRef}
+      onClick={() => onOpenModal(diagnosis)}
+      className="block w-20 h-28 overflow-hidden rounded-lg border-2 border-purple-500/30 hover:border-purple-400 transition-colors cursor-pointer"
+    >
+      {isLoading ? (
+        <div className="w-full h-full flex items-center justify-center bg-purple-900/50">
+          <span className="text-purple-300 text-lg animate-spin">🔄</span>
+        </div>
+      ) : imageUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={imageUrl}
+          alt={`${diagnosis.user_name}のカード`}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-purple-900/50">
+          <span className="text-purple-300 text-2xl">🎴</span>
+        </div>
+      )}
+    </button>
   );
 }
 
@@ -1466,27 +1165,31 @@ function StatCard({
   title,
   value,
   icon,
-  gradient,
+  color,
 }: {
   title: string;
   value: number;
   icon: string;
-  gradient: string;
+  color: "purple" | "blue" | "yellow" | "green";
 }) {
+  const colorClasses = {
+    purple: "from-purple-600/30 to-purple-900/30 border-purple-500/30",
+    blue: "from-blue-600/30 to-blue-900/30 border-blue-500/30",
+    yellow: "from-yellow-600/30 to-yellow-900/30 border-yellow-500/30",
+    green: "from-green-600/30 to-green-900/30 border-green-500/30",
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-slate-800/50 backdrop-blur-xl rounded-2xl p-5 border border-slate-700/50 relative overflow-hidden"
+      className={`bg-gradient-to-br ${colorClasses[color]} backdrop-blur-xl rounded-xl p-4 border`}
     >
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-10`} />
-      <div className="relative">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-2xl">{icon}</span>
-          <span className="text-slate-400 text-sm">{title}</span>
-        </div>
-        <div className="text-4xl font-bold text-white">{value.toLocaleString()}</div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-2xl">{icon}</span>
+        <span className="text-purple-300 text-sm">{title}</span>
       </div>
+      <div className="text-3xl font-bold text-white">{value}</div>
     </motion.div>
   );
 }
