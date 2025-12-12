@@ -738,7 +738,7 @@ export default function ResultPage() {
           className="mb-6 flex justify-center"
         >
           <div className="relative">
-            {cardImageUrl ? (
+            {cardImageUrl && !cardImageLoadError ? (
               <Image
                 src={cardImageUrl}
                 alt="生成されたカード"

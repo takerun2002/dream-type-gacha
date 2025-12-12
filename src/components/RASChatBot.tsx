@@ -626,70 +626,127 @@ export default function RASChatBot() {
       case "inquiry_form":
         return (
           <div className="space-y-4">
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                <Image src={RAS_IMAGES.apologize} alt="RASくん" width={40} height={40} className="object-cover" />
+            <div className="flex gap-3 items-start">
+              <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 12px rgba(251, 146, 60, 0.4)" }}>
+                <div className="w-full h-full border-2 border-orange-400/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                  <Image src={RAS_IMAGES.apologize} alt="RASくん" width={40} height={40} className="object-cover rounded-full" />
+                </div>
               </div>
-              <div className="flex-1 bg-white/95 rounded-2xl rounded-tl-sm p-3 text-gray-800 shadow-lg">
-                <p className="text-sm leading-relaxed">
-                  申し訳ありません、お力になれず...
+              <div
+                className="flex-1 rounded-2xl rounded-tl-sm p-4 shadow-lg"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                  boxShadow: "0 4px 15px rgba(201, 75, 124, 0.12)"
+                }}
+              >
+                <p className="text-sm leading-relaxed text-gray-700">
+                  申し訳ありません、お力になれず... 😢
                   <br /><br />
                   サポート担当に直接お問い合わせください。
                   <br />
-                  できるだけ早くご対応いたします。
+                  <span className="text-xs text-gray-500">できるだけ早くご対応いたします。</span>
                 </p>
               </div>
             </div>
 
             {userInfo && (
-              <div className="p-3 bg-white/5 rounded-lg text-sm">
-                <p className="text-purple-300/80">
-                  <span className="text-purple-400">お名前:</span> {userInfo.name}
-                </p>
-                <p className="text-purple-300/80">
-                  <span className="text-purple-400">夢タイプ:</span> {userInfo.dreamType}
-                </p>
+              <div
+                className="p-3 rounded-xl text-sm"
+                style={{
+                  background: "linear-gradient(135deg, rgba(201, 75, 124, 0.1) 0%, rgba(155, 75, 138, 0.08) 100%)",
+                  border: "1px solid rgba(201, 75, 124, 0.2)"
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-pink-400">👤</span>
+                  <span className="text-pink-200/90">{userInfo.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-pink-400">🎴</span>
+                  <span className="text-pink-200/90">{userInfo.dreamType}</span>
+                </div>
               </div>
             )}
 
             {viewedFaqs.length > 0 && (
-              <div className="p-2 bg-purple-900/30 rounded-lg text-xs text-purple-400/60">
-                確認済みFAQ: {viewedFaqs.length}件
+              <div
+                className="px-3 py-2 rounded-lg text-xs flex items-center gap-2"
+                style={{
+                  background: "rgba(155, 75, 138, 0.15)",
+                  color: "rgba(192, 132, 252, 0.8)"
+                }}
+              >
+                <span>📋</span>
+                <span>確認済みFAQ: {viewedFaqs.length}件</span>
               </div>
             )}
 
             <div>
-              <label className="block text-purple-300/80 text-sm mb-2">
-                お困りの内容を詳しく教えてください
+              <label className="block text-sm mb-2" style={{ color: "rgba(232, 180, 200, 0.9)" }}>
+                📝 お困りの内容を詳しく教えてください
               </label>
               <textarea
                 value={inquiryText}
                 onChange={(e) => setInquiryText(e.target.value)}
                 placeholder="例: カード画像が保存できない、○○のエラーが出る..."
-                className="w-full h-28 px-4 py-3 rounded-lg bg-white/10 border border-orange-400/30 text-white placeholder-white/30 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30 text-sm resize-none"
+                className="w-full h-28 px-4 py-3 rounded-xl text-sm resize-none transition-all duration-200"
+                style={{
+                  background: "rgba(45, 16, 40, 0.8)",
+                  border: "2px solid rgba(201, 75, 124, 0.3)",
+                  color: "white",
+                  outline: "none"
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "rgba(201, 75, 124, 0.6)";
+                  e.target.style.boxShadow = "0 0 20px rgba(201, 75, 124, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(201, 75, 124, 0.3)";
+                  e.target.style.boxShadow = "none";
+                }}
                 autoFocus
               />
             </div>
 
             {inquiryStatus === "error" && (
-              <p className="text-red-400 text-sm text-center">
-                送信に失敗しました。もう一度お試しください。
-              </p>
+              <div
+                className="p-3 rounded-xl text-sm text-center"
+                style={{
+                  background: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  color: "#f87171"
+                }}
+              >
+                ⚠️ 送信に失敗しました。もう一度お試しください。
+              </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={backToCategories}
-                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-purple-300 font-medium transition-colors"
+                className="flex-1 py-3 rounded-xl font-medium transition-all duration-200 hover:scale-[1.02]"
+                style={{
+                  background: "rgba(45, 16, 40, 0.6)",
+                  border: "1px solid rgba(201, 75, 124, 0.3)",
+                  color: "rgba(232, 180, 200, 0.8)"
+                }}
               >
-                戻る
+                ← 戻る
               </button>
               <button
                 onClick={submitInquiry}
                 disabled={!inquiryText.trim() || inquiryStatus === "sending"}
-                className="flex-1 py-3 bg-gradient-to-r from-orange-400 to-pink-500 hover:opacity-90 rounded-xl text-white font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl text-white font-bold transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: inquiryText.trim() && inquiryStatus !== "sending"
+                    ? "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)"
+                    : "linear-gradient(135deg, #6b6b6b 0%, #4a4a4a 100%)",
+                  boxShadow: inquiryText.trim() && inquiryStatus !== "sending"
+                    ? "0 4px 15px rgba(201, 75, 124, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+                    : "none"
+                }}
               >
-                {inquiryStatus === "sending" ? "送信中..." : "送信する"}
+                {inquiryStatus === "sending" ? "⏳ 送信中..." : "📤 送信する"}
               </button>
             </div>
           </div>
@@ -698,27 +755,39 @@ export default function RASChatBot() {
       case "inquiry_sent":
         return (
           <div className="space-y-4 text-center">
-            <div className="flex gap-3 justify-center">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                <Image src={RAS_IMAGES.happy} alt="RASくん" width={40} height={40} className="object-cover" />
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full overflow-hidden shadow-xl" style={{ boxShadow: "0 0 25px rgba(59, 130, 246, 0.5), 0 0 50px rgba(255, 165, 0, 0.3)" }}>
+                <div className="w-full h-full border-3 border-blue-400/60 rounded-full overflow-hidden bg-gradient-to-br from-blue-200 to-indigo-200 p-0.5">
+                  <Image src={RAS_IMAGES.happy} alt="RASくん" width={60} height={60} className="object-cover rounded-full" />
+                </div>
               </div>
             </div>
-            <div className="bg-white/95 rounded-2xl p-4 text-gray-800 shadow-lg">
-              <p className="text-4xl mb-2">✅</p>
-              <p className="text-sm font-bold mb-2">お問い合わせを受け付けました</p>
-              <p className="text-xs text-gray-600">
+            <div
+              className="rounded-2xl p-5 shadow-xl"
+              style={{
+                background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(239, 246, 255, 0.98) 100%)",
+                boxShadow: "0 4px 20px rgba(59, 130, 246, 0.15), 0 0 40px rgba(255, 200, 220, 0.1)"
+              }}
+            >
+              <p className="text-5xl mb-3">✅</p>
+              <p className="text-base font-bold mb-2 text-blue-600">お問い合わせを受け付けました</p>
+              <p className="text-sm text-gray-600">
                 サポート担当が確認次第、
                 <br />
                 ご連絡させていただきます。
                 <br /><br />
-                しばらくお待ちください。
+                <span className="text-xs text-gray-500">しばらくお待ちください 🙏</span>
               </p>
             </div>
             <button
               onClick={toggleChat}
-              className="w-full py-3 bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-xl font-bold shadow-lg hover:opacity-90 transition-opacity"
+              className="w-full py-3.5 text-white rounded-xl font-bold shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
+              style={{
+                background: "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)",
+                boxShadow: "0 4px 15px rgba(201, 75, 124, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)"
+              }}
             >
-              閉じる
+              閉じる ✨
             </button>
           </div>
         );
@@ -728,45 +797,71 @@ export default function RASChatBot() {
           <div className="space-y-4">
             {/* メッセージ一覧 */}
             {messages.length === 0 && (
-              <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                  <Image src={RAS_IMAGES.greeting} alt="RASくん" width={40} height={40} className="object-cover" />
+              <div className="flex gap-3 items-start">
+                <div className="w-11 h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 12px rgba(255, 165, 0, 0.4)" }}>
+                  <div className="w-full h-full border-2 border-orange-400/60 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                    <Image src={RAS_IMAGES.greeting} alt="RASくん" width={40} height={40} className="object-cover rounded-full" />
+                  </div>
                 </div>
-                <div className="flex-1 bg-white/95 rounded-2xl rounded-tl-sm p-3 text-gray-800 shadow-lg">
-                  <p className="text-sm leading-relaxed">
-                    何でも聞いてくださいね！
+                <div
+                  className="flex-1 rounded-2xl rounded-tl-sm p-4 shadow-lg"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                    boxShadow: "0 4px 15px rgba(201, 75, 124, 0.12)"
+                  }}
+                >
+                  <p className="text-sm leading-relaxed text-gray-700">
+                    何でも聞いてくださいね！ 💬✨
                   </p>
                 </div>
               </div>
             )}
 
             {messages.map((message, index) => (
-              <div key={index} className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""}`}>
+              <div key={index} className={`flex gap-3 items-start ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                 {message.role === "assistant" && (
-                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                    <Image src={RAS_IMAGES[emotion]} alt="RASくん" width={40} height={40} className="object-cover" />
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 10px rgba(255, 165, 0, 0.3)" }}>
+                    <div className="w-full h-full border-2 border-orange-400/50 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                      <Image src={RAS_IMAGES[emotion]} alt="RASくん" width={36} height={36} className="object-cover rounded-full" />
+                    </div>
                   </div>
                 )}
-                <div className={`max-w-[80%] rounded-2xl p-3 shadow-lg ${
-                  message.role === "user"
-                    ? "bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-tr-sm"
-                    : "bg-white/95 text-gray-800 rounded-tl-sm"
-                }`}>
+                <div
+                  className={`max-w-[80%] rounded-2xl p-3 shadow-lg ${
+                    message.role === "user" ? "rounded-tr-sm" : "rounded-tl-sm"
+                  }`}
+                  style={message.role === "user" ? {
+                    background: "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)",
+                    color: "white",
+                    boxShadow: "0 4px 12px rgba(201, 75, 124, 0.3)"
+                  } : {
+                    background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)",
+                    color: "#374151",
+                    boxShadow: "0 4px 12px rgba(201, 75, 124, 0.1)"
+                  }}
+                >
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
                 </div>
               </div>
             ))}
 
             {isLoading && (
-              <div className="flex gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-orange-400/50">
-                  <Image src={RAS_IMAGES.thinking} alt="RASくん" width={40} height={40} className="object-cover" />
+              <div className="flex gap-3 items-start">
+                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 shadow-lg" style={{ boxShadow: "0 0 10px rgba(255, 165, 0, 0.4)" }}>
+                  <div className="w-full h-full border-2 border-orange-400/50 rounded-full overflow-hidden bg-gradient-to-br from-orange-200 to-pink-200 p-0.5">
+                    <Image src={RAS_IMAGES.thinking} alt="RASくん" width={36} height={36} className="object-cover rounded-full" />
+                  </div>
                 </div>
-                <div className="bg-white/95 rounded-2xl rounded-tl-sm p-3 shadow-lg">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div
+                  className="rounded-2xl rounded-tl-sm px-4 py-3 shadow-lg"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(255, 250, 248, 0.98) 0%, rgba(255, 245, 250, 0.98) 100%)"
+                  }}
+                >
+                  <div className="flex gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ background: "#c94b7c", animationDelay: "0ms" }} />
+                    <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ background: "#9b4b8a", animationDelay: "150ms" }} />
+                    <span className="w-2.5 h-2.5 rounded-full animate-bounce" style={{ background: "#7a4b9b", animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -774,7 +869,7 @@ export default function RASChatBot() {
             <div ref={messagesEndRef} />
 
             {/* 入力エリア */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
               <textarea
                 ref={inputRef}
                 value={inputValue}
@@ -786,16 +881,38 @@ export default function RASChatBot() {
                   }
                 }}
                 placeholder="メッセージを入力..."
-                className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-orange-400/30 text-white placeholder-white/50 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30 text-sm resize-none"
+                className="flex-1 px-4 py-3 rounded-xl text-sm resize-none transition-all duration-200"
+                style={{
+                  background: "rgba(45, 16, 40, 0.8)",
+                  border: "2px solid rgba(201, 75, 124, 0.3)",
+                  color: "white",
+                  outline: "none"
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = "rgba(201, 75, 124, 0.6)";
+                  e.target.style.boxShadow = "0 0 15px rgba(201, 75, 124, 0.2)";
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "rgba(201, 75, 124, 0.3)";
+                  e.target.style.boxShadow = "none";
+                }}
                 rows={1}
                 disabled={isLoading}
               />
               <button
                 onClick={sendFreeChatMessage}
                 disabled={!inputValue.trim() || isLoading}
-                className="w-12 h-12 rounded-full bg-gradient-to-r from-orange-400 to-pink-500 text-white flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                style={{
+                  background: inputValue.trim() && !isLoading
+                    ? "linear-gradient(135deg, #c94b7c 0%, #9b4b8a 100%)"
+                    : "linear-gradient(135deg, #6b6b6b 0%, #4a4a4a 100%)",
+                  boxShadow: inputValue.trim() && !isLoading
+                    ? "0 4px 15px rgba(201, 75, 124, 0.4)"
+                    : "none"
+                }}
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
@@ -803,7 +920,8 @@ export default function RASChatBot() {
 
             <button
               onClick={backToCategories}
-              className="w-full py-2 text-purple-400/60 text-xs hover:text-purple-300 transition-colors"
+              className="w-full py-2 text-xs transition-all duration-200 hover:translate-x-[-4px]"
+              style={{ color: "rgba(192, 132, 252, 0.6)" }}
             >
               ← カテゴリ選択に戻る
             </button>
