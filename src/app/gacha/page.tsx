@@ -7,17 +7,16 @@ import Image from "next/image";
 import { dreamTypes } from "@/lib/dreamTypes";
 import Particles from "@/components/Particles";
 import GachaEffects from "@/components/GachaEffects";
+import { DiagnosisFlow } from "@/components/DiagnosisFlow";
 
-type Phase = "ready" | "reveal" | "complete";
+type Phase = "ready" | "reveal" | "diagnosis-flow";
 
 // キラキラエフェクトコンポーネント
 function Sparkles({ typeData }: { typeData: typeof dreamTypes[keyof typeof dreamTypes] }) {
   const sparklePositions = useMemo(() => {
-    // 固定のシード値を使用してランダム性を確保
     const positions: Array<{ x: number; y: number }> = [];
     for (let i = 0; i < 30; i++) {
-      // シードベースの疑似乱数生成
-      const seed = i * 0.618033988749895; // 黄金比
+      const seed = i * 0.618033988749895;
       const x = 50 + (Math.sin(seed * 1000) * 40);
       const y = 50 + (Math.cos(seed * 1000) * 40);
       positions.push({ x, y });
@@ -62,21 +61,22 @@ function Sparkles({ typeData }: { typeData: typeof dreamTypes[keyof typeof dream
   );
 }
 
+// カード画像のローカルストレージキー
+const CARD_IMAGE_STORAGE_KEY = "dream_card_image";
+
 export default function GachaPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("ready");
   const [userName, setUserName] = useState("");
   const [dreamType, setDreamType] = useState<string | null>(null);
+  const [diagnosisResult, setDiagnosisResult] = useState<Record<string, unknown> | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [showSparkles, setShowSparkles] = useState(false);
 
   useEffect(() => {
     const storedName = sessionStorage.getItem("userName");
     const storedType = sessionStorage.getItem("dreamType");
-
-    // #region agent log
-    (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-B',location:'src/app/gacha/page.tsx:useEffect(mount)',message:'gacha mount -> sessionStorage snapshot',data:{storedNameLen:(storedName||'').length,storedType,hasDiagnosisRecordId:!!sessionStorage.getItem('diagnosisRecordId')},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
-    // #endregion
+    const storedResult = sessionStorage.getItem("diagnosisResult");
 
     if (!storedName || !storedType) {
       router.push("/");
@@ -87,42 +87,130 @@ export default function GachaPage() {
     requestAnimationFrame(() => {
       setUserName(storedName);
       setDreamType(storedType);
+      if (storedResult) {
+        try {
+          setDiagnosisResult(JSON.parse(storedResult));
+        } catch {
+          // パースエラー時は無視
+        }
+      }
     });
+  }, [router]);
+
+  // DiagnosisFlow完了時のハンドラ
+  const handleDiagnosisFlowComplete = useCallback((cardImageUrl: string) => {
+    // カード画像をlocalStorageに保存
+    try {
+      localStorage.setItem(CARD_IMAGE_STORAGE_KEY, cardImageUrl);
+    } catch {
+      // localStorage保存失敗時は無視
+    }
+
+    // 結果ページに遷移
+    const rid = sessionStorage.getItem("diagnosisRecordId");
+    router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
   }, [router]);
 
   const handleStart = useCallback(() => {
     if (phase !== "ready") return;
-    
+
     setPhase("reveal");
     setShowSparkles(true);
 
+    // カードフリップアニメーション後にDiagnosisFlowへ移行
     setTimeout(() => {
-      setPhase("complete");
-      
-      setTimeout(() => {
-        const rid = sessionStorage.getItem("diagnosisRecordId");
-        // #region agent log
-        (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-C',location:'src/app/gacha/page.tsx:handleStart(navigate)',message:'gacha complete -> navigate to /result',data:{phase:'complete',dreamType,hasRid:!!rid,rid:rid||null},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
-        // #endregion
-        router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
-      }, 2500);
-    }, 3500);
-  }, [phase, router]);
+      setPhase("diagnosis-flow");
+    }, 3000);
+  }, [phase]);
 
   const handleSkip = () => {
     const rid = sessionStorage.getItem("diagnosisRecordId");
-    // #region agent log
-    (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-C',location:'src/app/gacha/page.tsx:handleSkip(navigate)',message:'gacha skip -> navigate to /result',data:{phase,hasRid:!!rid,rid:rid||null},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
-    // #endregion
     router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
   };
 
   const typeData = dreamType ? dreamTypes[dreamType] : null;
 
+  // DiagnosisFlow用のresultオブジェクトを構築
+  const diagnosisFlowResult = useMemo(() => {
+    if (!typeData || !userName || !dreamType) return null;
+
+    return {
+      dreamType,
+      typeName: typeData.name,
+      displayName: typeData.name,
+      message: (diagnosisResult?.personalizedMessage as string) || typeData.description,
+      icon: typeData.icon,
+      userName,
+      element: typeData.id,
+      keywords: typeData.keywords,
+      personality: typeData.description,
+      strengths: typeData.strengths,
+      fortuneData: diagnosisResult?.fortuneData ? {
+        bazi: {
+          yearPillar: ((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.year
+              ? ((((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.year as Record<string, unknown>)?.pillar as string
+              : ""
+            : "",
+          monthPillar: ((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.month
+              ? ((((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.month as Record<string, unknown>)?.pillar as string
+              : ""
+            : "",
+          dayPillar: ((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.day
+              ? ((((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.meishiki as Record<string, unknown>)?.day as Record<string, unknown>)?.pillar as string
+              : ""
+            : "",
+          elementBalance: ((diagnosisResult.fortuneData as Record<string, unknown>)?.bazi as Record<string, unknown>)?.elementBalance as {
+            wood: number;
+            fire: number;
+            earth: number;
+            metal: number;
+            water: number;
+          } || { wood: 0, fire: 0, earth: 0, metal: 0, water: 0 },
+        },
+        kyusei: {
+          name: ((diagnosisResult.fortuneData as Record<string, unknown>)?.kyusei as Record<string, unknown>)?.info
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.kyusei as Record<string, unknown>)?.info as Record<string, unknown>)?.name as string
+            : "",
+          character: ((diagnosisResult.fortuneData as Record<string, unknown>)?.kyusei as Record<string, unknown>)?.info
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.kyusei as Record<string, unknown>)?.info as Record<string, unknown>)?.character as string
+            : "",
+        },
+        numerology: {
+          lifePathNumber: ((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber as Record<string, unknown>)?.number as number
+            : 0,
+          name: ((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber as Record<string, unknown>)?.info
+              ? ((((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber as Record<string, unknown>)?.info as Record<string, unknown>)?.name as string
+              : ""
+            : "",
+          mission: ((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber
+            ? (((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber as Record<string, unknown>)?.info
+              ? ((((diagnosisResult.fortuneData as Record<string, unknown>)?.numerology as Record<string, unknown>)?.lifePathNumber as Record<string, unknown>)?.info as Record<string, unknown>)?.mission as string
+              : ""
+            : "",
+        },
+      } : undefined,
+    };
+  }, [typeData, userName, dreamType, diagnosisResult]);
+
+  // DiagnosisFlowフェーズの表示
+  if (phase === "diagnosis-flow" && diagnosisFlowResult) {
+    return (
+      <DiagnosisFlow
+        result={diagnosisFlowResult}
+        onComplete={handleDiagnosisFlowComplete}
+      />
+    );
+  }
+
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ 
+      style={{
         background: "radial-gradient(ellipse at center, #1a0a2e 0%, #0a0612 50%, #000000 100%)"
       }}
       onClick={phase === "ready" ? handleStart : undefined}
@@ -132,11 +220,11 @@ export default function GachaPage() {
 
       {/* パーティクルエフェクト */}
       {showSparkles && <Particles />}
-      
+
       {/* 強化版ガチャエフェクト */}
-      <GachaEffects 
-        isActive={phase === "reveal"} 
-        color={typeData?.color || "#9333ea"} 
+      <GachaEffects
+        isActive={phase === "reveal"}
+        color={typeData?.color || "#9333ea"}
       />
 
       {/* スキップボタン */}
@@ -209,7 +297,7 @@ export default function GachaPage() {
                     {/* 装飾パターン */}
                     <div className="absolute inset-4 border-2 border-purple-500/30 rounded-xl" />
                     <div className="absolute inset-6 border border-gold-400/20 rounded-lg" />
-                    
+
                     {/* メインコンテンツ */}
                     <motion.div
                       animate={{ rotate: 360 }}
@@ -218,14 +306,14 @@ export default function GachaPage() {
                     >
                       ✨
                     </motion.div>
-                    
+
                     <div className="text-gradient text-2xl font-bold tracking-wider mb-2">
                       KINMAN CARD
                     </div>
                     <div className="text-purple-400/60 text-sm">
                       Dream Type Gacha
                     </div>
-                    
+
                     {/* 下部のブランド */}
                     <div className="absolute bottom-6 text-purple-500/40 text-xs">
                       Date with Dream Note
@@ -251,7 +339,7 @@ export default function GachaPage() {
           </motion.div>
         )}
 
-        {/* ========== 開封フェーズ ========== */}
+        {/* ========== 開封フェーズ（カードフリップ） ========== */}
         {phase === "reveal" && typeData && (
           <motion.div
             key="reveal"
@@ -300,7 +388,7 @@ export default function GachaPage() {
                       priority
                     />
                     {/* グロー効果 */}
-                    <div 
+                    <div
                       className="absolute inset-0 opacity-30"
                       style={{
                         background: `radial-gradient(circle at center, ${typeData.color} 0%, transparent 70%)`
@@ -323,83 +411,6 @@ export default function GachaPage() {
             >
               あなたの守護獣が判明しました！
             </motion.p>
-          </motion.div>
-        )}
-
-        {/* ========== 完了フェーズ ========== */}
-        {phase === "complete" && typeData && (
-          <motion.div
-            key="complete"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 200 }}
-            className="text-center"
-          >
-            {/* カード画像表示 */}
-            <motion.div
-              initial={{ y: -30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mb-6 relative w-[260px] h-[370px] mx-auto"
-            >
-              <Image
-                src={`/cards/kinman-${typeData.id}.png`}
-                alt={typeData.name}
-                fill
-                className="object-contain rounded-2xl"
-                style={{
-                  boxShadow: `0 0 40px ${typeData.color}60`,
-                }}
-              />
-              {/* キラキラアニメーション */}
-              <motion.div
-                animate={{ 
-                  opacity: [0.3, 0.6, 0.3],
-                  scale: [1, 1.05, 1]
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 rounded-2xl"
-                style={{
-                  background: `linear-gradient(45deg, transparent 40%, ${typeData.color}40 50%, transparent 60%)`,
-                  backgroundSize: "200% 200%",
-                }}
-              />
-            </motion.div>
-
-            {/* タイプ名 */}
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-3xl font-bold mb-2 text-glow"
-              style={{ color: typeData.color }}
-            >
-              {typeData.icon} {typeData.name}
-            </motion.h2>
-
-            {/* ローディング */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="text-purple-300"
-            >
-              <p className="mb-4">詳細な診断結果を準備中...</p>
-              <div className="flex justify-center gap-2">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{
-                      duration: 0.5,
-                      repeat: Infinity,
-                      delay: i * 0.15
-                    }}
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: typeData.color }}
-                  />
-                ))}
-              </div>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
