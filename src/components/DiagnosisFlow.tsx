@@ -1,11 +1,9 @@
 /**
  * 夢タイプ診断ガチャ - 演出フローコンポーネント
- * Manus AI 調査結果を基に実装
- * 
- * 3段階演出:
- * 1. 共通演出（8秒）- きんまん + 水晶玉
- * 2. タイプ別演出（8秒）- 診断結果の動物 + バックグラウンドカード生成
- * 3. カード登場（2秒）- 3D回転 + エフェクト
+ *
+ * 2段階演出:
+ * 1. きんまん先生の占い演出（動画 + プログレスバー）- カード生成完了まで継続
+ * 2. カード登場（3D回転 + パーティクルエフェクト）
  */
 
 'use client';
@@ -59,9 +57,9 @@ interface DiagnosisFlowProps {
   onComplete: (cardImage: string) => void;
 }
 
-// ==================== ステージ1: 共通演出（きんまん先生の占い動画） ====================
+// ==================== きんまん先生の占い演出（動画 + プログレスバー） ====================
 
-function CommonRevealStage() {
+function FortuneLoadingStage({ progress, typeName }: { progress: number; typeName: string }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -70,192 +68,105 @@ function CommonRevealStage() {
       transition={{ duration: 0.5 }}
       className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-black z-50"
     >
-      <div className="relative w-full max-w-md px-4">
-        {/* 背景グロー */}
+      <div className="relative w-full max-w-md min-h-[400px] flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/80 to-indigo-900/80 rounded-2xl p-6 mx-4 overflow-hidden">
+        {/* きんまん先生動画アニメーション */}
         <motion.div
-          className="absolute inset-0 rounded-2xl blur-2xl opacity-40"
-          style={{
-            background: "radial-gradient(circle, rgba(147,112,219,0.8) 0%, rgba(147,112,219,0) 70%)",
-          }}
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        {/* メインコンテンツ */}
-        <motion.div
-          className="relative z-10"
+          className="relative"
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          {/* きんまん先生の占い動画 */}
-          <div className="relative bg-gradient-to-b from-purple-900/80 to-indigo-900/80 rounded-2xl p-6 overflow-hidden">
-            <motion.div
-              className="relative flex justify-center"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-            >
-              {/* 動画プレイヤー */}
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="relative z-10 w-[280px] h-[280px] object-cover rounded-lg"
-              >
-                <source src="/animations/kinman-fortune-light.mp4" type="video/mp4" />
-              </video>
-            </motion.div>
-
-            {/* テキスト */}
-            <motion.div
-              className="mt-4 text-center z-10"
-              animate={{ opacity: [0.7, 1, 0.7] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <p className="text-lg font-bold text-gradient mb-1">
-                🔮 あなたの運命を占っています...
-              </p>
-              <p className="text-purple-300 text-sm">
-                きんまん先生がカードを召喚中
-              </p>
-            </motion.div>
-
-            {/* ローディングドット */}
-            <div className="flex justify-center gap-2 mt-3">
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  className="w-3 h-3 bg-purple-400 rounded-full"
-                  animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    delay: i * 0.3,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </motion.div>
-  );
-}
-
-// ==================== ステージ2: タイプ別演出 ====================
-
-function TypeSpecificStage({ dreamType, typeColor }: { dreamType: string; typeColor: string }) {
-  const typeData = dreamTypes[dreamType];
-  
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-      className="fixed inset-0 flex items-center justify-center bg-black z-50"
-    >
-      <div className="relative w-full max-w-lg px-4">
-        {/* 背景エフェクト */}
-        <motion.div
-          className="absolute inset-0 rounded-3xl"
-          animate={{
-            boxShadow: [
-              `0 0 30px ${typeColor}50`,
-              `0 0 60px ${typeColor}80`,
-              `0 0 30px ${typeColor}50`,
-            ],
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
-
-        {/* タイプアイコン大表示 */}
-        <motion.div
-          className="relative z-10 flex flex-col items-center justify-center aspect-square"
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ duration: 0.8, type: 'spring', stiffness: 100 }}
-        >
-          {/* 光の輪 */}
+          {/* 背景のグロウエフェクト */}
           <motion.div
-            className="absolute w-64 h-64 rounded-full border-4"
-            style={{ borderColor: typeColor }}
-            animate={{ rotate: 360, scale: [1, 1.1, 1] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-          />
-          <motion.div
-            className="absolute w-80 h-80 rounded-full border-2"
-            style={{ borderColor: `${typeColor}60` }}
-            animate={{ rotate: -360 }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
-          />
-
-          {/* タイプアイコン */}
-          <motion.div
-            className="text-9xl z-10"
+            className="absolute inset-0 rounded-full blur-2xl opacity-40"
+            style={{
+              background: "radial-gradient(circle, rgba(147,112,219,0.8) 0%, rgba(147,112,219,0) 70%)",
+            }}
             animate={{
               scale: [1, 1.2, 1],
-              rotate: [0, 5, -5, 0],
+              opacity: [0.3, 0.5, 0.3],
             }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            {typeData?.icon || '✨'}
-          </motion.div>
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          />
 
-          {/* タイプ名 */}
-          <motion.h2
-            className="mt-8 text-3xl font-bold text-white text-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            style={{ textShadow: `0 0 20px ${typeColor}` }}
+          {/* 動画プレイヤー */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="relative z-10 w-[280px] h-[280px] object-cover rounded-lg"
           >
-            {typeData?.name || dreamType}タイプ
-          </motion.h2>
+            <source src="/animations/kinman-fortune-light.mp4" type="video/mp4" />
+          </video>
         </motion.div>
 
-        {/* ローディングインジケーター */}
+        {/* テキストとプログレス */}
         <motion.div
-          className="absolute bottom-8 left-0 right-0 flex justify-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
+          className="mt-4 text-center z-10"
+          animate={{ opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
-          <div className="flex gap-2">
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                className="w-3 h-3 rounded-full bg-white"
-                animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
-                transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-              />
-            ))}
-          </div>
+          <p className="text-lg font-bold text-gradient mb-1">
+            🔮 あなたの運命を占っています...
+          </p>
+          <p className="text-purple-300 text-sm">
+            きんまん先生が{typeName}カードを召喚中
+          </p>
         </motion.div>
+
+        {/* プログレスバー */}
+        <div className="w-full max-w-xs mt-3">
+          <div className="bg-purple-900/50 rounded-full h-2 mb-1 overflow-hidden">
+            <motion.div
+              className="h-2 rounded-full"
+              style={{
+                background: "linear-gradient(90deg, #9370db, #ff6b9d, #ffd700)",
+              }}
+              initial={{ width: "0%" }}
+              animate={{ width: `${Math.min(progress, 100)}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+          <p className="text-purple-400 text-xs text-center">
+            {Math.round(progress)}% 完了
+          </p>
+        </div>
+
+        {/* 四柱推命データ計算中... の表示 */}
+        <motion.p
+          className="text-xs text-purple-400/80 mt-2"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        >
+          {progress < 30 && "四柱推命データを計算中..."}
+          {progress >= 30 && progress < 60 && "九星気学を分析中..."}
+          {progress >= 60 && progress < 90 && "カードを生成中..."}
+          {progress >= 90 && "まもなく完了..."}
+        </motion.p>
       </div>
     </motion.div>
   );
 }
 
-// ==================== ステージ3: カード登場 ====================
+// ==================== カード登場演出 ====================
 
-function CardReveal({ 
-  cardImage, 
+function CardRevealStage({
+  cardImage,
   typeColor,
-  onAnimationComplete 
-}: { 
-  cardImage: string; 
+  typeName,
+  typeIcon,
+  onAnimationComplete
+}: {
+  cardImage: string;
   typeColor: string;
+  typeName: string;
+  typeIcon: string;
   onAnimationComplete?: () => void;
 }) {
   return (
     <motion.div
-      className="fixed inset-0 flex items-center justify-center bg-black z-50"
+      className="fixed inset-0 flex flex-col items-center justify-center bg-black z-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
@@ -312,6 +223,21 @@ function CardReveal({
           animate={{ opacity: [0.3, 0.1, 0.3] }}
           transition={{ duration: 2, repeat: Infinity }}
         />
+      </motion.div>
+
+      {/* タイプ名表示 */}
+      <motion.div
+        className="mt-6 text-center z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <p className="text-3xl font-bold" style={{ color: typeColor, textShadow: `0 0 20px ${typeColor}` }}>
+          {typeIcon} {typeName}
+        </p>
+        <p className="text-purple-300 text-sm mt-2">
+          あなたの守護獣が判明しました！
+        </p>
       </motion.div>
 
       {/* パーティクルエフェクト */}
@@ -408,30 +334,22 @@ function SparkleEffect() {
 // ==================== 統合フロー ====================
 
 export function DiagnosisFlow({ result, onComplete }: DiagnosisFlowProps) {
-  const [stage, setStage] = useState<'common' | 'type-specific' | 'card'>('common');
+  const [stage, setStage] = useState<'loading' | 'card'>('loading');
   const [cardImage, setCardImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const typeData = dreamTypes[result.dreamType];
   const typeColor = typeData?.color || '#a855f7';
-
-  // ステージ1: 共通演出（8秒）
-  useEffect(() => {
-    if (stage === 'common') {
-      const timer = setTimeout(() => {
-        setStage('type-specific');
-      }, 6000); // 少し短めに調整
-
-      return () => clearTimeout(timer);
-    }
-  }, [stage]);
+  const typeName = typeData?.name || result.typeName;
+  const typeIcon = typeData?.icon || '✨';
 
   // カード生成関数
   const generateCard = useCallback(async () => {
     if (isGenerating || cardImage) return;
-    
+
     setIsGenerating(true);
-    
+
     try {
       const cardData: CardDataGemini = {
         dreamType: result.dreamType,
@@ -449,29 +367,46 @@ export function DiagnosisFlow({ result, onComplete }: DiagnosisFlowProps) {
 
       const imageUrl = await generateCardWithGemini(cardData);
       setCardImage(imageUrl);
+      setProgress(100);
     } catch (error) {
       console.error('Failed to generate card:', error);
       // フォールバック: タイプのカード画像を使用
       setCardImage(typeData ? `/cards/kinman-${typeData.id}.png` : '/images/fallback-card.png');
+      setProgress(100);
     } finally {
       setIsGenerating(false);
     }
   }, [result, isGenerating, cardImage, typeData]);
 
-  // ステージ2: タイプ別演出（8秒）+ バックグラウンドでカード生成
+  // マウント時にカード生成開始
   useEffect(() => {
-    if (stage === 'type-specific') {
-      // カード生成を開始
-      generateCard();
+    generateCard();
+  }, [generateCard]);
 
-      // 8秒後にカードステージへ
+  // プログレスアニメーション（疑似的な進捗表示）
+  useEffect(() => {
+    if (stage !== 'loading') return;
+
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev; // 90%で止める（完了時に100%になる）
+        return prev + Math.random() * 8;
+      });
+    }, 800);
+
+    return () => clearInterval(progressInterval);
+  }, [stage]);
+
+  // カード生成完了時にステージ切り替え
+  useEffect(() => {
+    if (cardImage && progress >= 100) {
+      // 少し待ってからカード表示へ
       const timer = setTimeout(() => {
         setStage('card');
-      }, 8000);
-
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [stage, generateCard]);
+  }, [cardImage, progress]);
 
   // カード完了時の処理
   const handleCardAnimationComplete = useCallback(() => {
@@ -485,27 +420,21 @@ export function DiagnosisFlow({ result, onComplete }: DiagnosisFlowProps) {
 
   return (
     <AnimatePresence mode="wait">
-      {stage === 'common' && <CommonRevealStage key="common" />}
-      {stage === 'type-specific' && (
-        <TypeSpecificStage 
-          key="type" 
-          dreamType={result.dreamType} 
-          typeColor={typeColor}
+      {stage === 'loading' && (
+        <FortuneLoadingStage
+          key="loading"
+          progress={progress}
+          typeName={typeName}
         />
       )}
       {stage === 'card' && cardImage && (
-        <CardReveal
+        <CardRevealStage
           key="card"
           cardImage={cardImage}
           typeColor={typeColor}
+          typeName={typeName}
+          typeIcon={typeIcon}
           onAnimationComplete={handleCardAnimationComplete}
-        />
-      )}
-      {stage === 'card' && !cardImage && (
-        <TypeSpecificStage 
-          key="type-waiting" 
-          dreamType={result.dreamType} 
-          typeColor={typeColor}
         />
       )}
     </AnimatePresence>
@@ -513,18 +442,3 @@ export function DiagnosisFlow({ result, onComplete }: DiagnosisFlowProps) {
 }
 
 export default DiagnosisFlow;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
