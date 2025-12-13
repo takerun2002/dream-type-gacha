@@ -187,11 +187,19 @@ export async function POST(request: NextRequest) {
         combinedScores[type] = (questionScore * 0.6) + (fortuneScore * 0.4);
       }
       
-      // 最高スコアのタイプを最終結果に
-      const topType = Object.entries(combinedScores)
-        .sort((a, b) => b[1] - a[1])[0][0];
-      
-      finalDreamType = topType;
+      // 最高スコアのタイプを最終結果に（同点時は決定論的に選択）
+      const sortedTypes = Object.entries(combinedScores)
+        .sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1];
+          // 同点の場合は固定順序で決定（毎回同じ結果を保証）
+          const rank: Record<string, number> = {
+            phoenix: 0, kitsune: 1, pegasus: 2, elephant: 3,
+            deer: 4, dragon: 5, turtle: 6, shark: 7, wolf: 8
+          };
+          return (rank[a[0]] ?? 99) - (rank[b[0]] ?? 99);
+        });
+
+      finalDreamType = sortedTypes[0][0];
     }
 
     const finalTypeData = dreamTypes[finalDreamType] || typeData;

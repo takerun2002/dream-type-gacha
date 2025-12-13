@@ -354,6 +354,7 @@ export default function ResultPage() {
     let storedName = sessionStorage.getItem("userName");
     let storedType = sessionStorage.getItem("dreamType");
     const storedResult = sessionStorage.getItem("diagnosisResult");
+    const rid = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("rid") : null;
 
     // sessionStorageにない場合、localStorageから復元を試みる
     if (!storedName || !storedType) {
@@ -390,6 +391,10 @@ export default function ResultPage() {
       setUserName(storedName!);
       setDreamType(storedType!);
     });
+
+    // #region agent log
+    (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-B',location:'src/app/result/page.tsx:useEffect(restore_diagnosis_state)',message:'result mount -> chose dreamType/userName source',data:{ridPresent:!!rid,rid:rid||null,storedType,storedNameLen:(storedName||'').length,hasStoredResult:!!storedResult,parsedResultDreamType:(result as any)?.dreamType||null},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
+    // #endregion
 
     const timer = setTimeout(() => setShowConfetti(false), 5000);
     return () => clearTimeout(timer);

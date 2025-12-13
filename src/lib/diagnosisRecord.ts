@@ -66,6 +66,7 @@ export async function checkCanDiagnose(): Promise<DiagnosisCheckResult> {
         .from("diagnosis_records")
         .select("dream_type, user_name, fingerprint, created_at")
         .eq("fingerprint", fingerprint)
+        .order("created_at", { ascending: false })
         .limit(1);
 
       if (error) {

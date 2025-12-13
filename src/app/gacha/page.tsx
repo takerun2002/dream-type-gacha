@@ -74,6 +74,10 @@ export default function GachaPage() {
     const storedName = sessionStorage.getItem("userName");
     const storedType = sessionStorage.getItem("dreamType");
 
+    // #region agent log
+    (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-B',location:'src/app/gacha/page.tsx:useEffect(mount)',message:'gacha mount -> sessionStorage snapshot',data:{storedNameLen:(storedName||'').length,storedType,hasDiagnosisRecordId:!!sessionStorage.getItem('diagnosisRecordId')},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
+    // #endregion
+
     if (!storedName || !storedType) {
       router.push("/");
       return;
@@ -97,6 +101,9 @@ export default function GachaPage() {
       
       setTimeout(() => {
         const rid = sessionStorage.getItem("diagnosisRecordId");
+        // #region agent log
+        (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-C',location:'src/app/gacha/page.tsx:handleStart(navigate)',message:'gacha complete -> navigate to /result',data:{phase:'complete',dreamType,hasRid:!!rid,rid:rid||null},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
+        // #endregion
         router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
       }, 2500);
     }, 3500);
@@ -104,6 +111,9 @@ export default function GachaPage() {
 
   const handleSkip = () => {
     const rid = sessionStorage.getItem("diagnosisRecordId");
+    // #region agent log
+    (() => { try { if (localStorage.getItem("__dbg") === "1") { fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'type-glitch-run1',hypothesisId:'H-C',location:'src/app/gacha/page.tsx:handleSkip(navigate)',message:'gacha skip -> navigate to /result',data:{phase,hasRid:!!rid,rid:rid||null},timestamp:Date.now()})}).catch(()=>{});} } catch {} })();
+    // #endregion
     router.push(rid ? `/result?rid=${encodeURIComponent(rid)}` : "/result");
   };
 

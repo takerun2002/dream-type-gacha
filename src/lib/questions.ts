@@ -282,7 +282,7 @@ export function calculateResult(answers: Array<{ questionId: number; answerId?: 
     }
   });
 
-  // 最高スコアのタイプを返す（同点の場合はランダムに選択）
+  // 最高スコアのタイプを返す（同点の場合も同じ回答なら同じ結果になるよう決定論的に選択）
   let maxScore = 0;
   const topTypes: string[] = [];
 
@@ -296,9 +296,35 @@ export function calculateResult(answers: Array<{ questionId: number; answerId?: 
     }
   });
 
-  // 同点の場合はランダムに選択
+  // 同点の場合は決定論的に選択（同じ回答なら毎回同じ結果）
   if (topTypes.length > 1) {
-    return topTypes[Math.floor(Math.random() * topTypes.length)];
+    const rank: Record<string, number> = {
+      phoenix: 0,
+      kitsune: 1,
+      pegasus: 2,
+      elephant: 3,
+      deer: 4,
+      dragon: 5,
+      turtle: 6,
+      shark: 7,
+      wolf: 8,
+    };
+    const sortedTopTypes = topTypes
+      .slice()
+      .sort((a, b) => (rank[a] ?? 999) - (rank[b] ?? 999));
+
+    const seed = answers
+      .filter((a) => a.answerId)
+      .map((a) => `${a.questionId}:${a.answerId}`)
+      .sort()
+      .join("|");
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+    }
+    const chosen = sortedTopTypes[hash % sortedTopTypes.length];
+
+    return chosen;
   }
 
   return topTypes[0] || "phoenix";

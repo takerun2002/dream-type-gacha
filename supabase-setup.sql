@@ -60,3 +60,4 @@ CREATE POLICY "Allow read for all" ON diagnosis_records
 
 
 
+
