@@ -74,6 +74,21 @@ export default function GachaPage() {
   const [showSparkles, setShowSparkles] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    // テストモード: ?test=1 でダミーデータを使用
+    if (params.get("test") === "1") {
+      const testType = params.get("type") || "phoenix"; // ?type=dragon など指定可能
+      setUserName("テストユーザー");
+      setDreamType(testType);
+      setDiagnosisResult({
+        dreamType: testType,
+        personalizedMessage: "これはテストメッセージです。",
+        fortuneData: null,
+      });
+      return;
+    }
+
     const storedName = sessionStorage.getItem("userName");
     const storedType = sessionStorage.getItem("dreamType");
     const storedResult = sessionStorage.getItem("diagnosisResult");
