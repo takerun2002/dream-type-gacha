@@ -138,8 +138,23 @@ export default function Home() {
   // ※ パスワード認証後にリザルトへ遷移するよう変更
   useEffect(() => {
     const checkDiagnosis = async () => {
-      // テストモード: ?test=1 でスキップ（パスワードもスキップ）
       const params = new URLSearchParams(window.location.search);
+
+      // リセットモード: ?reset=1 でlocalStorageをクリアして再診断許可
+      // （管理者がSupabase上のレコードを削除した後に使用）
+      if (params.get("reset") === "1") {
+        localStorage.removeItem("dream_diagnosis_completed");
+        localStorage.removeItem("dream_diagnosis_fp");
+        localStorage.removeItem("dream_card_image");
+        localStorage.removeItem("dream_diagnosis_record_id");
+        sessionStorage.clear();
+        // URLからreset=1を削除（履歴には残さない）
+        window.history.replaceState({}, "", window.location.pathname);
+        setCheckingLimit(false);
+        return;
+      }
+
+      // テストモード: ?test=1 でスキップ（パスワードもスキップ）
       if (params.get("test") === "1") {
         setCheckingLimit(false);
         setStep("welcome"); // パスワードをスキップ

@@ -233,7 +233,12 @@ export default function AdminPage() {
       });
       const data = await response.json();
       if (data.success) {
-        setDeleteStatus("✅ " + data.message);
+        const baseUrl = window.location.origin;
+        setDeleteStatus(
+          `✅ ${data.message}\n\n` +
+          `📋 再診断用URL（ユーザーに共有）:\n${baseUrl}/?reset=1\n\n` +
+          `※ このURLにアクセスするとブラウザの診断済みデータがクリアされ、再診断できます`
+        );
         // 検索結果から削除
         setSearchResults(prev => prev.filter(r => r.user_name !== userName));
         // 統計を更新
