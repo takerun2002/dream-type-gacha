@@ -59,7 +59,7 @@ interface DiagnosisFlowProps {
   onComplete: (cardImage: string) => void;
 }
 
-// ==================== ステージ1: 共通演出 ====================
+// ==================== ステージ1: 共通演出（きんまん先生の占い動画） ====================
 
 function CommonRevealStage() {
   return (
@@ -70,71 +70,77 @@ function CommonRevealStage() {
       transition={{ duration: 0.5 }}
       className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-black z-50"
     >
-      <div className="relative w-full max-w-lg px-4">
+      <div className="relative w-full max-w-md px-4">
         {/* 背景グロー */}
         <motion.div
-          className="absolute inset-0 rounded-3xl bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 blur-3xl opacity-40"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 3, repeat: Infinity }}
+          className="absolute inset-0 rounded-2xl blur-2xl opacity-40"
+          style={{
+            background: "radial-gradient(circle, rgba(147,112,219,0.8) 0%, rgba(147,112,219,0) 70%)",
+          }}
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
 
-        {/* ビデオコンテナ */}
+        {/* メインコンテンツ */}
         <motion.div
-          className="relative z-10 rounded-3xl overflow-hidden shadow-2xl"
-          initial={{ scale: 0.8, opacity: 0 }}
+          className="relative z-10"
+          initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
+          transition={{ duration: 0.5 }}
         >
-          {/* 動画がない場合のフォールバック（きんまん画像 + アニメーション） */}
-          <div className="relative aspect-[9/16] bg-gradient-to-b from-purple-900 to-black flex flex-col items-center justify-center">
-            {/* 水晶玉エフェクト */}
+          {/* きんまん先生の占い動画 */}
+          <div className="relative bg-gradient-to-b from-purple-900/80 to-indigo-900/80 rounded-2xl p-6 overflow-hidden">
             <motion.div
-              className="absolute w-40 h-40 rounded-full bg-gradient-to-br from-purple-400 via-blue-400 to-purple-600"
-              animate={{
-                boxShadow: [
-                  '0 0 30px rgba(147, 51, 234, 0.5)',
-                  '0 0 60px rgba(147, 51, 234, 0.8)',
-                  '0 0 30px rgba(147, 51, 234, 0.5)',
-                ],
-                scale: [1, 1.05, 1],
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-              style={{ top: '35%' }}
+              className="relative flex justify-center"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
             >
-              <div className="absolute inset-2 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
+              {/* 動画プレイヤー */}
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="relative z-10 w-[280px] h-[280px] object-cover rounded-lg"
+              >
+                <source src="/animations/kinman-fortune-light.mp4" type="video/mp4" />
+              </video>
             </motion.div>
 
-            {/* きんまんキャラクター */}
+            {/* テキスト */}
             <motion.div
-              className="relative z-10 mt-auto mb-8"
-              animate={{ y: [0, -5, 0] }}
+              className="mt-4 text-center z-10"
+              animate={{ opacity: [0.7, 1, 0.7] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <Image
-                src="/images/kinman-sitting-transparent.png"
-                alt="きんまん先生"
-                width={200}
-                height={200}
-                className="drop-shadow-2xl"
-              />
+              <p className="text-lg font-bold text-gradient mb-1">
+                🔮 あなたの運命を占っています...
+              </p>
+              <p className="text-purple-300 text-sm">
+                きんまん先生がカードを召喚中
+              </p>
             </motion.div>
+
+            {/* ローディングドット */}
+            <div className="flex justify-center gap-2 mt-3">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-3 h-3 bg-purple-400 rounded-full"
+                  animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    delay: i * 0.3,
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </motion.div>
-
-        {/* テキストオーバーレイ */}
-        <motion.div
-          className="absolute bottom-16 left-0 right-0 text-center z-20"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1, duration: 0.6 }}
-        >
-          <motion.p
-            className="text-white text-xl font-bold drop-shadow-lg"
-            animate={{ opacity: [1, 0.7, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            🔮 あなたの運命を占いましょう...
-          </motion.p>
         </motion.div>
       </div>
     </motion.div>
