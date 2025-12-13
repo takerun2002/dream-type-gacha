@@ -217,12 +217,8 @@ export default function Home() {
       setCurrentQuestion(currentQuestion + 1);
     } else {
       setStep("processing");
-      
-      try {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D1',location:'app/page.tsx:diagnose-start',message:'diagnose fetch start',data:{hasName:!!userName,nameLen:userName?.length||0,hasBirthDate:!!birthDate,hasBirthYear:!!birthDate?.year,hasBirthMonth:!!birthDate?.month,hasBirthDay:!!birthDate?.day,answersCount:newAnswers.length,choiceAnswersCount:newAnswers.filter(a=>!!a.answerId).length,textAnswersCount:newAnswers.filter(a=>!!a.textAnswer).length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
 
+      try {
         const response = await fetch("/api/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,54 +229,31 @@ export default function Home() {
           }),
         });
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D1',location:'app/page.tsx:diagnose-response',message:'diagnose response received',data:{status:response.status,ok:response.ok,contentType:response.headers.get('content-type')||null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
+        const data = await response.json();
 
-        let data: any = null;
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          const fallbackText = await response.text().catch(() => "");
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D2',location:'app/page.tsx:diagnose-json-error',message:'diagnose response.json() failed',data:{status:response.status,contentType:response.headers.get('content-type')||null,errorName:(jsonError as any)?.name||null,errorMessage:String(jsonError),textLen:fallbackText.length,textPrefix:fallbackText.slice(0,120)},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-          throw jsonError;
-        }
-
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D3',location:'app/page.tsx:diagnose-json',message:'diagnose json parsed',data:{success:!!data?.success,hasResult:!!data?.result,hasError:!!data?.error,errorPrefix:typeof data?.error==='string'?data.error.slice(0,120):null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
-        
         if (data.success) {
           sessionStorage.setItem("userName", userName);
           sessionStorage.setItem("dreamType", data.result.dreamType);
           sessionStorage.setItem("diagnosisResult", JSON.stringify(data.result));
           sessionStorage.setItem("answers", JSON.stringify(newAnswers));
-          
+
           // おひとり様1回制限: 診断完了を記録（DB + ローカル）
           const rec = await recordDiagnosis(data.result.dreamType, userName);
           if (rec?.recordId) {
             sessionStorage.setItem("diagnosisRecordId", rec.recordId);
             localStorage.setItem("dream_diagnosis_record_id", rec.recordId);
           }
-          
+
           setTimeout(() => {
             router.push("/gacha");
           }, 1500);
         } else {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D3',location:'app/page.tsx:diagnose-fail',message:'diagnose returned success=false',data:{errorPrefix:typeof data?.error==='string'?data.error.slice(0,160):null},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           alert("診断処理中にエラーが発生しました");
           setStep("questions");
           setCurrentQuestion(questions.length - 1);
         }
       } catch (error) {
         console.error("診断エラー:", error);
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/5be1a6a7-7ee8-4fe8-9b00-19e37afd0e10',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'diag-run1',hypothesisId:'D4',location:'app/page.tsx:diagnose-catch',message:'diagnose flow threw',data:{errorName:(error as any)?.name||null,errorMessage:String(error)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         alert("診断処理中にエラーが発生しました");
         setStep("questions");
         setCurrentQuestion(questions.length - 1);
