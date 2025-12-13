@@ -54,3 +54,6 @@ service-account.json
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# アーカイブ（古い指示書）
+.archive/
